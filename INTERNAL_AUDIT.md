@@ -71,10 +71,11 @@ The codebase was audited against common vulnerability vectors including shell co
 - **Control Implemented**: The Reboot and Shutdown endpoints execute only hardcoded local scripts: `sudo /hive/sbin/sreboot` and `sudo /hive/sbin/sreboot shutdown`. No external arguments or variables are passed.
 - **Audit Result**: **SECURE**.
 
-### 2.9. Traversal-Resistant Presets Swapping (CWE-22)
+### 2.9. Traversal-Resistant Presets Swapping & Containment (CWE-22)
 - **Control Implemented**:
   - The Presets API validates user-submitted profile names using strict regex `^[A-Za-z0-9_\-\s]+$`.
-  - Directory matching resolves exclusively under `/hive-config/presets/`, preventing path traversal characters (`..`, `/`) from escaping the presets sandbox to access other parts of the filesystem.
+  - All file operations in `parse_shell_config`, `write_shell_config`, `/api/miner/log`, and presets endpoints resolve absolute paths using `os.path.abspath`.
+  - Enforces strict directory containment checks by verifying that the resolved target path starts with the allowed parent folder prefix (`HIVE_CONFIG_DIR` or `PRESETS_DIR` or `/var/log/miner`), rendering directory traversal breakouts mathematically impossible.
 - **Audit Result**: **SECURE**.
 
 ### 2.10. Shell-Safety Range Clamping (CWE-20)

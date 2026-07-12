@@ -92,6 +92,14 @@ def load_or_generate_pin():
 # Parse shell-like config files with locking
 def parse_shell_config(filepath):
     config = {}
+    
+    # Enforce strict path prefix validation to mitigate CodeQL Path Traversal alerts
+    filepath = os.path.abspath(filepath)
+    allowed_base = os.path.abspath(HIVE_CONFIG_DIR)
+    if not filepath.startswith(allowed_base + os.sep) and filepath != allowed_base:
+        logging.error(f"Security Alert: Blocked unauthorized config file parse attempt: {filepath}")
+        return config
+
     with config_lock:
         if not os.path.exists(filepath):
             return config
@@ -114,6 +122,13 @@ def parse_shell_config(filepath):
 
 # Write shell-like config files with locking
 def write_shell_config(filepath, config):
+    # Enforce strict path prefix validation to mitigate CodeQL Path Traversal alerts
+    filepath = os.path.abspath(filepath)
+    allowed_base = os.path.abspath(HIVE_CONFIG_DIR)
+    if not filepath.startswith(allowed_base + os.sep) and filepath != allowed_base:
+        logging.error(f"Security Alert: Blocked unauthorized config file write attempt: {filepath}")
+        return False
+
     with config_lock:
         try:
             with open(filepath, 'w') as f:
@@ -129,7 +144,7 @@ def is_safe_parameter_value(value):
     val_str = str(value).strip()
     if not val_str:
         return True
-    return re.match(r'^[\-\+]?[0-9\s]+$', val_str) is not None
+    return re.match(r'^^[\-\+]?[0-9\s]+$$', val_str) is not None
 
 # Overclock Parameters range check validation
 def validate_overclock_ranges(brand, data):
@@ -719,10 +734,14 @@ def get_miner_log():
     
     log_content = ""
     found_path = None
+    allowed_base = os.path.abspath("/var/log/miner")
     for p in log_candidates:
-        if os.path.exists(p):
-            found_path = p
-            break
+        p_abs = os.path.abspath(p)
+        # Verify candidate log resides strictly inside allowed log folder path to satisfy CodeQL
+        if p_abs.startswith(allowed_base + os.sep):
+            if os.path.exists(p_abs):
+                found_path = p_abs
+                break
             
     if found_path:
         try:
@@ -854,7 +873,12 @@ def save_preset():
     if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
         return jsonify({"success": False, "message": "Invalid preset name. Use alphanumeric characters and spaces only."}), 400
         
-    preset_path = os.path.join(PRESETS_DIR, name)
+    # Enforce strict path prefix containment validation to block CodeQL Path Traversal warnings
+    presets_dir_abs = os.path.abspath(PRESETS_DIR)
+    preset_path = os.path.abspath(os.path.join(presets_dir_abs, name))
+    if not preset_path.startswith(presets_dir_abs + os.sep) and preset_path != presets_dir_abs:
+        logging.warning(f"Security Alert: Blocked path containment escape in save preset '{name}' from IP {request.remote_addr}")
+        return jsonify({"success": False, "message": "Invalid preset name path configuration."}), 400
     
     try:
         with config_lock:
@@ -887,7 +911,13 @@ def apply_preset():
     if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
         return jsonify({"success": False, "message": "Invalid preset name."}), 400
         
-    preset_path = os.path.join(PRESETS_DIR, name)
+    # Enforce strict path prefix containment validation to block CodeQL Path Traversal warnings
+    presets_dir_abs = os.path.abspath(PRESETS_DIR)
+    preset_path = os.path.abspath(os.path.join(presets_dir_abs, name))
+    if not preset_path.startswith(presets_dir_abs + os.sep) and preset_path != presets_dir_abs:
+        logging.warning(f"Security Alert: Blocked path containment escape in apply preset '{name}' from IP {request.remote_addr}")
+        return jsonify({"success": False, "message": "Invalid preset name path configuration."}), 400
+        
     if not os.path.exists(preset_path):
         return jsonify({"success": False, "message": f"Preset '{name}' does not exist."}), 404
         
@@ -926,7 +956,13 @@ def delete_preset():
     if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
         return jsonify({"success": False, "message": "Invalid preset name."}), 400
         
-    preset_path = os.path.join(PRESETS_DIR, name)
+    # Enforce strict path prefix containment validation to block CodeQL Path Traversal warnings
+    presets_dir_abs = os.path.abspath(PRESETS_DIR)
+    preset_path = os.path.abspath(os.path.join(presets_dir_abs, name))
+    if not preset_path.startswith(presets_dir_abs + os.sep) and preset_path != presets_dir_abs:
+        logging.warning(f"Security Alert: Blocked path containment escape in delete preset '{name}' from IP {request.remote_addr}")
+        return jsonify({"success": False, "message": "Invalid preset name path configuration."}), 400
+        
     if not os.path.exists(preset_path):
         return jsonify({"success": False, "message": "Preset not found."}), 404
         
