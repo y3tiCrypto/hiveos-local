@@ -79,18 +79,29 @@ Overclocking optimizes the graphics card's hashrate (speed) and reduces power dr
 HiveOS-Local interfaces directly with the native HiveOS configurations stored inside the `/hive-config/` directory:
 
 - **/hive-config/rig.conf**: Parsed to display the rig's local designation (Rig ID, Active Miner, and HiveOS version).
+- **/hive-config/wallet.conf**: Parsed to extract the active mined coin/cryptocurrency symbol.
 - **/hive-config/nvidia-oc.conf**: Spliced when saving NVIDIA overclocks. Contains space-separated parameters mapping to GPU indices (e.g. `CORE="100 120 0"`). After writing, it executes `sudo /hive/sbin/nvidia-oc` to apply parameters immediately.
 - **/hive-config/amd-oc.conf**: Spliced when saving AMD overclocks. After writing, it executes `sudo /hive/sbin/amd-oc` to apply changes.
+- **/hive-config/dashboard.key**: Stores the 6-digit PIN used for dashboard authorization.
 
-### Running Locally (Demo Mode)
+---
 
-For development or preview, you can run the application on Windows, macOS, or standard Linux distributions. It will automatically detect the absence of HiveOS directories, generate dummy configuration files in the root folder, and spawn a simulated rig with mocked Nvidia and AMD graphics cards.
+## CPU Mining & Tuning Control
 
-Run the Flask server using:
-```bash
-python app.py
-```
-Open `http://localhost:1337` in your browser. Any overclocking adjustments you submit will modify the mock configurations on your disk and simulate performance differences in the UI.
+For rigs running CPU miners (e.g. **XMRig**), the dashboard provides real-time CPU diagnostics and control:
+- **Processor Identification**: Automatically parses and displays the processor name from `/proc/cpuinfo`.
+- **Core Temperatures**: Reads core temps from system-level hardware sensors inside `/sys/class/thermal`.
+- **Huge Pages Optimization**: Displays VM Huge Pages status. Selecting **"Toggle Huge Pages"** invokes `sudo /hive/bin/hugepages enable|disable` immediately. Enabling Huge Pages is highly recommended for algorithms like RandomX (Monero) to prevent hashrate drop.
+- **CPU Hashrate Logging**: Extracts live performance rates directly from the miner log output file at `/var/log/miner/xmrig/lastrun_noappend.log`.
+
+---
+
+## Miner Operations Management
+
+The dashboard offers direct miner lifecycle buttons inside the System Diagnostics section:
+- **Start Miner**: Runs `sudo /hive/bin/miner start` as root to boot mining operations.
+- **Stop Miner**: Runs `sudo /hive/bin/miner stop` as root to temporarily suspend active mining processes.
+- **Restart Miner**: Runs `sudo /hive/bin/miner stop && sudo /hive/bin/miner start` to refresh active configurations on the fly.
 
 ---
 
@@ -99,7 +110,7 @@ Open `http://localhost:1337` in your browser. Any overclocking adjustments you s
 Because this dashboard executes shell scripts and controls hardware voltages:
 
 1. **Firewall Boundaries**: Do not expose port `1337` directly to the open internet. Access the dashboard exclusively via local Wi-Fi / LAN, or use a secure VPN (like WireGuard or OpenVPN) if connecting remotely.
-2. **Access Security**: The 6-digit key PIN restricts admin features. Keep the PIN confidential. To regenerate the PIN at any time, delete `/hive-config/dashboard.key` (or `./dashboard.key` in demo mode) and restart the service.
+2. **Access Security**: The 6-digit key PIN restricts admin features. Keep the PIN confidential. To regenerate the PIN at any time, delete `/hive-config/dashboard.key` and restart the service.
 
 ---
 

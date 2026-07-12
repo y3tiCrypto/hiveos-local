@@ -44,9 +44,6 @@
                 <span class="badge bg-success-glow d-flex align-items-center gap-1 py-2 px-3 border border-success">
                     <span class="pulse-indicator"></span> Live Monitoring Active
                 </span>
-                <span id="demoModeBadge" class="badge bg-warning-glow text-warning border border-warning py-2 px-3 d-none">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Demo Mode (Simulated)
-                </span>
                 <div class="badge bg-dark-card border border-secondary-subtle py-2 px-3 text-secondary-emphasis">
                     <i class="bi bi-laptop me-1"></i> <span id="localIpAddress">Scanning...</span>
                 </div>
@@ -135,6 +132,27 @@
                                 <div class="stat-box">
                                     <span class="stat-label">Mined Crypto</span>
                                     <span id="statCoin" class="stat-value text-warning fw-bold">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="my-3 border-secondary-subtle">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small fw-semibold text-muted text-uppercase letter-spacing-0.05em">Miner Operations:</span>
+                                </div>
+                            </div>
+                            <div class="col-md-8 text-md-end">
+                                <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                                    <button id="minerStartBtn" class="btn btn-sm btn-success fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-play-fill"></i> Start Miner
+                                    </button>
+                                    <button id="minerStopBtn" class="btn btn-sm btn-danger fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-stop-fill"></i> Stop Miner
+                                    </button>
+                                    <button id="minerRestartBtn" class="btn btn-sm btn-warning fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-arrow-clockwise"></i> Restart Miner
+                                    </button>
                                 </div>
                             </div>
                         </div>

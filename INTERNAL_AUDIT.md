@@ -38,7 +38,7 @@ The codebase was audited against common vulnerability vectors including shell co
 ### 2.3. Authentication & Access Control (CWE-306)
 - **Vulnerability Context**: Operating on port `1337` on all LAN interfaces (`0.0.0.0`) exposes the dashboard to anyone on the same subnet. Without authentication, anyone on the local network could modify GPU clocks, increase voltages, or stop mining.
 - **Control Implemented**: 
-  - An auto-generated, randomized 6-digit access PIN is created during installation and stored in `/hive-config/dashboard.key` (or `./dashboard.key` in Demo Mode).
+  - An auto-generated, randomized 6-digit access PIN is created during installation and stored in `/hive-config/dashboard.key`.
   - Flask session cookie protection manages authentication states.
   - A `before_request` hook intercepts unauthorized API requests, returning `401 Unauthorized` responses and forcing the frontend to show the login overlay.
 - **Audit Result**: **SECURE**. Sessions are protected by a random secret key generated on server boot.
@@ -51,6 +51,13 @@ The codebase was audited against common vulnerability vectors including shell co
 ### 2.5. Fail-Safe Rollback Mechanics
 - **Control Implemented**: The backend automatically executes `backup_configs()` before writing any new overclocking profiles to disk, duplicating the configuration files to `nvidia-oc.conf.bak` and `amd-oc.conf.bak`.
 - **Audit Result**: **VERIFIED**. If an unstable clock offset is applied, clicking the "Revert Settings" button restores the backup configuration and applies it immediately.
+
+### 2.6. Whitelisted Privilege Command Execution (CWE-250 / Sudo Exec)
+- **Vulnerability Context**: Accessing `/api/hugepages` (for CPU mining tuning) and `/api/miner/control` (to start, stop, or restart mining operations) requires executing commands with elevated root privileges (`sudo`). Allowing arbitrary user inputs here would lead to OS command injection.
+- **Control Implemented**:
+  - The Huge Pages toggle accepts only boolean values, mapping strictly to whitelisted actions: `sudo /hive/bin/hugepages enable` or `sudo /hive/bin/hugepages disable`.
+  - The Miner Control API checks action strings against a strict string whitelist: `["start", "stop", "restart"]`. It translates them directly to fixed root scripts: `sudo /hive/bin/miner start` and `sudo /hive/bin/miner stop`.
+- **Audit Result**: **SECURE**. Input validation prevents any external characters from reaching command strings.
 
 ---
 

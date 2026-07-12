@@ -19,19 +19,11 @@ RIG_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "rig.conf")
 NVIDIA_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "nvidia-oc.conf")
 AMD_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "amd-oc.conf")
 WALLET_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "wallet.conf")
+PIN_PATH = os.path.join(HIVE_CONFIG_DIR, "dashboard.key")
 
-# Check environment
+# Verify environments
 IS_LINUX = platform.system() == "Linux"
 HAS_HIVEOS = IS_LINUX and os.path.exists(HIVE_CONFIG_DIR)
-
-# Local configuration fallback paths for Demo Mode
-MOCK_NVIDIA_OC_CONF = "./mock_nvidia-oc.conf"
-MOCK_AMD_OC_CONF = "./mock_amd-oc.conf"
-MOCK_RIG_CONF = "./mock_rig.conf"
-MOCK_WALLET_CONF = "./mock_wallet.conf"
-
-# Access PIN Key Path
-PIN_PATH = os.path.join(HIVE_CONFIG_DIR, "dashboard.key") if HAS_HIVEOS else "./dashboard.key"
 
 # Thread safety lock for files access
 config_lock = threading.Lock()
@@ -56,7 +48,6 @@ def get_local_ip():
     """Detects primary LAN IP interface."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Connect to public DNS address without sending packets to query routing table
         s.connect(('8.8.8.8', 1))
         ip = s.getsockname()[0]
     except Exception:
@@ -64,18 +55,6 @@ def get_local_ip():
     finally:
         s.close()
     return ip
-
-def get_rig_config_path():
-    return RIG_CONF_PATH if HAS_HIVEOS else MOCK_RIG_CONF
-
-def get_nvidia_oc_path():
-    return NVIDIA_OC_CONF if HAS_HIVEOS else MOCK_NVIDIA_OC_CONF
-
-def get_amd_oc_path():
-    return AMD_OC_CONF if HAS_HIVEOS else MOCK_AMD_OC_CONF
-
-def get_wallet_config_path():
-    return WALLET_CONF_PATH if HAS_HIVEOS else MOCK_WALLET_CONF
 
 # Load or generate access authentication PIN
 def load_or_generate_pin():
@@ -94,51 +73,11 @@ def load_or_generate_pin():
         try:
             with open(PIN_PATH, 'w') as f:
                 f.write(pin)
-            if HAS_HIVEOS:
-                os.chmod(PIN_PATH, 0o600) # Read/write by root only
+            os.chmod(PIN_PATH, 0o600) # Read/write by root only
             logging.info(f"Generated new dashboard access PIN: {pin}")
         except Exception as e:
             logging.error(f"Failed to write access PIN: {e}")
         return pin
-
-# Initialize mock config files if not exists in Demo Mode
-def init_mock_configs():
-    if not HAS_HIVEOS:
-        with config_lock:
-            if not os.path.exists(MOCK_WALLET_CONF):
-                with open(MOCK_WALLET_CONF, 'w') as f:
-                    f.write('COIN="KAS"\n')
-            if not os.path.exists(MOCK_RIG_CONF):
-                with open(MOCK_RIG_CONF, 'w') as f:
-                    f.write(
-                        'HIVE_VERSION="0.6-220@230501"\n'
-                        'RIG_ID="133742"\n'
-                        'RIG_PASSWD="demo_passwd"\n'
-                        'FARM_HASH="d3m0ha5h123456789"\n'
-                        'API_URL="https://api.hiveon.net"\n'
-                        'MINER="lolminer"\n'
-                    )
-            if not os.path.exists(MOCK_NVIDIA_OC_CONF):
-                with open(MOCK_NVIDIA_OC_CONF, 'w') as f:
-                    f.write(
-                        'CORE="100 0"\n'
-                        'MEM="1000 2000"\n'
-                        'PL="120 250"\n'
-                        'FAN="60 0"\n'
-                    )
-            if not os.path.exists(MOCK_AMD_OC_CONF):
-                with open(MOCK_AMD_OC_CONF, 'w') as f:
-                    f.write(
-                        'CORE="1100"\n'
-                        'MEM="2000"\n'
-                        'VDD="800"\n'
-                        'VDDCI="750"\n'
-                        'MVDD="1300"\n'
-                        'FAN="65"\n'
-                        'PL="100"\n'
-                        'DPM="4"\n'
-                        'REF="30"\n'
-                    )
 
 # Parse shell-like config files with locking
 def parse_shell_config(filepath):
@@ -180,27 +119,21 @@ def is_safe_parameter_value(value):
     val_str = str(value).strip()
     if not val_str:
         return True
-    # Whitelist: Digits, whitespace, negative/positive sign
     return re.match(r'^[\-\+]?[0-9\s]+$', val_str) is not None
 
 # Create backup files of current config files
 def backup_configs():
     try:
-        nv_path = get_nvidia_oc_path()
-        if os.path.exists(nv_path):
-            shutil.copy2(nv_path, nv_path + ".bak")
-            
-        amd_path = get_amd_oc_path()
-        if os.path.exists(amd_path):
-            shutil.copy2(amd_path, amd_path + ".bak")
+        if os.path.exists(NVIDIA_OC_CONF):
+            shutil.copy2(NVIDIA_OC_CONF, NVIDIA_OC_CONF + ".bak")
+        if os.path.exists(AMD_OC_CONF):
+            shutil.copy2(AMD_OC_CONF, AMD_OC_CONF + ".bak")
         return True
     except Exception as e:
         logging.error(f"Failed to create backups of configurations: {e}")
         return False
 
-# CPU Mining States
-MOCK_HUGEPAGES_STATE = True
-
+# CPU Mining Statistics Gatherers
 def get_cpu_model():
     if IS_LINUX:
         try:
@@ -208,9 +141,9 @@ def get_cpu_model():
                 for line in f:
                     if line.strip().startswith('model name'):
                         return line.split(':')[1].strip()
-        except Exception:
-            pass
-    return "AMD Ryzen 9 5900X 12-Core Processor"
+        except Exception as e:
+            logging.error(f"Failed to parse /proc/cpuinfo: {e}")
+    return "Unknown CPU"
 
 def get_cpu_temp():
     if IS_LINUX:
@@ -229,12 +162,9 @@ def get_cpu_temp():
                         return temp
                 except Exception:
                     pass
-    return 45 # Default fallback
+    return 0
 
 def check_hugepages_status():
-    global MOCK_HUGEPAGES_STATE
-    if not HAS_HIVEOS:
-        return MOCK_HUGEPAGES_STATE
     if IS_LINUX:
         try:
             with open('/proc/meminfo', 'r') as f:
@@ -247,10 +177,6 @@ def check_hugepages_status():
     return False
 
 def get_xmrig_hashrate():
-    if not HAS_HIVEOS:
-        hp = check_hugepages_status()
-        return 12850.5 if hp else 6425.2
-    
     log_path = "/var/log/miner/xmrig/lastrun_noappend.log"
     if os.path.exists(log_path):
         try:
@@ -273,7 +199,6 @@ def get_system_stats():
         "cpu_load": [0.0, 0.0, 0.0],
         "ram_used_pct": 0.0,
         "ram_total_gb": 0.0,
-        "is_demo": not HAS_HIVEOS,
         "rig_id": "Offline",
         "farm_hash": "Offline",
         "hive_version": "Local-1.0",
@@ -286,14 +211,14 @@ def get_system_stats():
         }
     }
 
-    rig_conf = parse_shell_config(get_rig_config_path())
+    rig_conf = parse_shell_config(RIG_CONF_PATH)
     stats["rig_id"] = rig_conf.get("RIG_ID", "Not Found")
     stats["farm_hash"] = rig_conf.get("FARM_HASH", "Not Found")
-    stats["hive_version"] = rig_conf.get("HIVE_VERSION", "Demo-v0.6")
-    stats["active_miner"] = rig_conf.get("MINER", "lolminer")
+    stats["hive_version"] = rig_conf.get("HIVE_VERSION", "Not Found")
+    stats["active_miner"] = rig_conf.get("MINER", "None")
 
-    wallet_conf = parse_shell_config(get_wallet_config_path())
-    stats["coin"] = wallet_conf.get("COIN", "Unknown")
+    wallet_conf = parse_shell_config(WALLET_CONF_PATH)
+    stats["coin"] = wallet_conf.get("COIN", "None")
 
     if IS_LINUX:
         try:
@@ -323,11 +248,6 @@ def get_system_stats():
                 stats["ram_total_gb"] = round(mem_total / (1024 * 1024), 1)
         except Exception:
             pass
-    else:
-        stats["uptime"] = "1h 45m"
-        stats["cpu_load"] = [0.45, 0.30, 0.15]
-        stats["ram_used_pct"] = 42.5
-        stats["ram_total_gb"] = 16.0
 
     return stats
 
@@ -344,11 +264,9 @@ def get_gpu_stats():
     gpus = []
     
     # 1. NVIDIA telemetry
-    nvidia_detected = False
     if HAS_HIVEOS or IS_LINUX:
         stdout, stderr, code = run_command("nvidia-smi --query-gpu=index,name,temperature.gpu,fan.speed,power.draw,utilization.gpu,clocks.current.graphics,clocks.current.memory,power.limit --format=csv,noheader,nounits")
         if code == 0 and stdout:
-            nvidia_detected = True
             lines = stdout.strip().split('\n')
             for line in lines:
                 parts = [p.strip() for p in line.split(',')]
@@ -366,11 +284,10 @@ def get_gpu_stats():
                         "utilization": int(parts[5]),
                         "core_clock": int(parts[6]),
                         "mem_clock": int(parts[7]),
-                        "hashrate": round(50.0 + (int(parts[6]) % 10) + (int(parts[7]) % 20) / 10.0, 2)
+                        "hashrate": 0.0 # live hashrate must be read from miners; setting default
                     })
 
     # 2. AMD telemetry
-    amd_detected = False
     if HAS_HIVEOS or IS_LINUX:
         if os.path.exists("/sys/class/drm"):
             cards = [d for d in os.listdir("/sys/class/drm") if re.match(r'^card\d+$', d)]
@@ -422,91 +339,22 @@ def get_gpu_stats():
                             "temp": temp,
                             "fan": fan,
                             "power": power,
-                            "power_limit": 150.0,
-                            "utilization": 99,
-                            "core_clock": 1200,
-                            "mem_clock": 2000,
-                            "hashrate": 30.5
+                            "power_limit": 0.0,
+                            "utilization": 0,
+                            "core_clock": 0,
+                            "mem_clock": 0,
+                            "hashrate": 0.0
                         })
                         amd_idx += 1
-                        amd_detected = True
                     except Exception as e:
                         logging.error(f"Error reading AMD sysfs indices: {e}")
-
-    # 3. Fallback mock setup
-    if not nvidia_detected and not amd_detected:
-        nv_oc = parse_shell_config(get_nvidia_oc_path())
-        amd_oc = parse_shell_config(get_amd_oc_path())
-
-        nv_core = nv_oc.get("CORE", "0 0").split()
-        nv_mem = nv_oc.get("MEM", "0 0").split()
-        nv_pl = nv_oc.get("PL", "0 0").split()
-        nv_fan = nv_oc.get("FAN", "0 0").split()
-        
-        nv_core += ["0"] * (2 - len(nv_core))
-        nv_mem += ["0"] * (2 - len(nv_mem))
-        nv_pl += ["0"] * (2 - len(nv_pl))
-        nv_fan += ["0"] * (2 - len(nv_fan))
-
-        gpus.append({
-            "id": "NV_0",
-            "index": 0,
-            "brand": "NVIDIA",
-            "model": "GeForce RTX 3080",
-            "temp": 62,
-            "fan": int(nv_fan[0]) if int(nv_fan[0]) > 0 else 55,
-            "power": float(nv_pl[0]) - 10 if int(nv_pl[0]) > 0 else 220.0,
-            "power_limit": float(nv_pl[0]) if int(nv_pl[0]) > 0 else 250.0,
-            "utilization": 100,
-            "core_clock": 1450 + (int(nv_core[0]) if int(nv_core[0]) > 500 else 0),
-            "mem_clock": 4750 + int(nv_mem[0]),
-            "hashrate": round(95.0 + (int(nv_mem[0]) / 100.0) + (10 if int(nv_core[0]) > 500 else 0), 2)
-        })
-
-        gpus.append({
-            "id": "NV_1",
-            "index": 1,
-            "brand": "NVIDIA",
-            "model": "GeForce RTX 3070 Ti",
-            "temp": 58,
-            "fan": int(nv_fan[1]) if int(nv_fan[1]) > 0 else 48,
-            "power": float(nv_pl[1]) - 15 if int(nv_pl[1]) > 0 else 185.0,
-            "power_limit": float(nv_pl[1]) if int(nv_pl[1]) > 0 else 220.0,
-            "utilization": 100,
-            "core_clock": 1580 + (int(nv_core[1]) if int(nv_core[1]) > 500 else 0),
-            "mem_clock": 4500 + int(nv_mem[1]),
-            "hashrate": round(60.0 + (int(nv_mem[1]) / 120.0), 2)
-        })
-
-        amd_core = amd_oc.get("CORE", "0").split()
-        amd_mem = amd_oc.get("MEM", "0").split()
-        amd_fan = amd_oc.get("FAN", "0").split()
-        
-        amd_core += ["0"]
-        amd_mem += ["0"]
-        amd_fan += ["0"]
-
-        gpus.append({
-            "id": "AMD_0",
-            "index": 0,
-            "brand": "AMD",
-            "model": "Radeon RX 6800 XT",
-            "temp": 68,
-            "fan": int(amd_fan[0]) if int(amd_fan[0]) > 0 else 60,
-            "power": 165.0,
-            "power_limit": float(amd_oc.get("PL", "180").split()[0]),
-            "utilization": 99,
-            "core_clock": int(amd_core[0]) if int(amd_core[0]) > 0 else 2100,
-            "mem_clock": int(amd_mem[0]) if int(amd_mem[0]) > 0 else 1000,
-            "hashrate": round(62.5 + (int(amd_mem[0]) - 1000) / 40.0 if int(amd_mem[0]) > 0 else 62.5, 2)
-        })
 
     return gpus
 
 # Read configs formatted
 def get_overclocks_formatted():
-    nv_data = parse_shell_config(get_nvidia_oc_path())
-    amd_data = parse_shell_config(get_amd_oc_path())
+    nv_data = parse_shell_config(NVIDIA_OC_CONF)
+    amd_data = parse_shell_config(AMD_OC_CONF)
     
     return {
         "nvidia": {
@@ -531,10 +379,8 @@ def get_overclocks_formatted():
 # Require authentication for all endpoints
 @app.before_request
 def require_auth():
-    # Exclude authentication check for /api/login and static assets
     if request.path == '/api/login' or request.path.startswith('/static/'):
         return
-    # If session is unauthorized
     if not session.get('authenticated'):
         return jsonify({"success": False, "authenticated": False, "message": "Unauthorized"}), 401
 
@@ -576,7 +422,7 @@ def save_overclock():
     backup_configs()
         
     if brand == "NVIDIA":
-        filepath = get_nvidia_oc_path()
+        filepath = NVIDIA_OC_CONF
         config = parse_shell_config(filepath)
         
         core = config.get("CORE", "").split()
@@ -607,14 +453,13 @@ def save_overclock():
         write_shell_config(filepath, config)
         logging.info(f"NVIDIA GPU {gpu_index} parameters updated: Core={data.get('core')}, Mem={data.get('mem')}, PL={data.get('pl')}, Fan={data.get('fan')}")
         
-        if HAS_HIVEOS:
-            stdout, stderr, code = run_command("sudo /hive/sbin/nvidia-oc")
-            if code != 0:
-                logging.error(f"NVIDIA OC script failed: {stderr}")
-                return jsonify({"success": False, "message": f"NVIDIA OC Script execution failed: {stderr}"})
+        stdout, stderr, code = run_command("sudo /hive/sbin/nvidia-oc")
+        if code != 0:
+            logging.error(f"NVIDIA OC script failed: {stderr}")
+            return jsonify({"success": False, "message": f"NVIDIA OC Script execution failed: {stderr}"})
         
     elif brand == "AMD":
-        filepath = get_amd_oc_path()
+        filepath = AMD_OC_CONF
         config = parse_shell_config(filepath)
         
         fields = ["CORE", "MEM", "VDD", "VDDCI", "MVDD", "FAN", "PL", "DPM", "REF"]
@@ -634,38 +479,33 @@ def save_overclock():
         write_shell_config(filepath, config)
         logging.info(f"AMD GPU {gpu_index} parameters updated: {config}")
         
-        if HAS_HIVEOS:
-            stdout, stderr, code = run_command("sudo /hive/sbin/amd-oc")
-            if code != 0:
-                logging.error(f"AMD OC script failed: {stderr}")
-                return jsonify({"success": False, "message": f"AMD OC Script execution failed: {stderr}"})
+        stdout, stderr, code = run_command("sudo /hive/sbin/amd-oc")
+        if code != 0:
+            logging.error(f"AMD OC script failed: {stderr}")
+            return jsonify({"success": False, "message": f"AMD OC Script execution failed: {stderr}"})
                 
     return jsonify({"success": True, "message": f"Overclock parameters successfully saved and applied to {brand} GPU {gpu_index}!"})
 
 @app.route('/api/revert', methods=['POST'])
 def revert_overclock():
     try:
-        nv_path = get_nvidia_oc_path()
-        nv_bak = nv_path + ".bak"
-        amd_path = get_amd_oc_path()
-        amd_bak = amd_path + ".bak"
+        nv_bak = NVIDIA_OC_CONF + ".bak"
+        amd_bak = AMD_OC_CONF + ".bak"
 
         if not os.path.exists(nv_bak) and not os.path.exists(amd_bak):
             return jsonify({"success": False, "message": "No stable backups found to restore."}), 404
             
         with config_lock:
             if os.path.exists(nv_bak):
-                shutil.copy2(nv_bak, nv_path)
+                shutil.copy2(nv_bak, NVIDIA_OC_CONF)
             if os.path.exists(amd_bak):
-                shutil.copy2(amd_bak, amd_path)
+                shutil.copy2(amd_bak, AMD_OC_CONF)
                 
-        # Apply configurations in system
-        if HAS_HIVEOS:
-            if os.path.exists(nv_bak):
-                run_command("sudo /hive/sbin/nvidia-oc")
-            if os.path.exists(amd_bak):
-                run_command("sudo /hive/sbin/amd-oc")
-                
+        if os.path.exists(nv_bak):
+            run_command("sudo /hive/sbin/nvidia-oc")
+        if os.path.exists(amd_bak):
+            run_command("sudo /hive/sbin/amd-oc")
+                     
         logging.info(f"Configurations successfully reverted by request from {request.remote_addr}")
         return jsonify({"success": True, "message": "Overclock settings reverted to previous configuration!"})
     except Exception as e:
@@ -674,15 +514,8 @@ def revert_overclock():
 
 @app.route('/api/hugepages', methods=['POST'])
 def toggle_hugepages():
-    global MOCK_HUGEPAGES_STATE
     data = request.get_json()
     enable = data.get("enable", True) if data else True
-    
-    if not HAS_HIVEOS:
-        MOCK_HUGEPAGES_STATE = enable
-        msg = "Huge Pages enabled (Simulated)" if enable else "Huge Pages disabled (Simulated)"
-        logging.info(msg)
-        return jsonify({"success": True, "message": msg})
         
     action = "enable" if enable else "disable"
     cmd = f"sudo /hive/bin/hugepages {action}"
@@ -696,6 +529,33 @@ def toggle_hugepages():
         logging.error(f"Failed to configure Huge Pages: {stderr}")
         return jsonify({"success": False, "message": f"Failed to configure Huge Pages: {stderr}"}), 500
 
+@app.route('/api/miner/control', methods=['POST'])
+def miner_control():
+    data = request.get_json()
+    if not data or 'action' not in data:
+        return jsonify({"success": False, "message": "Missing action parameter"}), 400
+        
+    action = str(data['action']).strip().lower()
+    if action not in ["start", "stop", "restart"]:
+        return jsonify({"success": False, "message": "Invalid action parameter. Must be start, stop, or restart."}), 400
+        
+    logging.info(f"Miner control request: '{action}' received from IP: {request.remote_addr}")
+    
+    if action == "start":
+        stdout, stderr, code = run_command("sudo /hive/bin/miner start")
+    elif action == "stop":
+        stdout, stderr, code = run_command("sudo /hive/bin/miner stop")
+    elif action == "restart":
+        stdout, stderr, code = run_command("sudo /hive/bin/miner stop && sudo /hive/bin/miner start")
+        
+    if code == 0:
+        msg = f"Miner successfully {action}ed!"
+        logging.info(msg)
+        return jsonify({"success": True, "message": msg})
+    else:
+        logging.error(f"Miner control command failed: {stderr}")
+        return jsonify({"success": False, "message": f"Miner command failed: {stderr}"}), 500
+
 @app.route('/api/stats')
 def api_stats():
     return jsonify({
@@ -706,35 +566,43 @@ def api_stats():
 
 @app.route('/')
 def dashboard():
-    # Render main HTML layout; authentication is managed asynchronously via JS
     return render_template('index.html')
 
 if __name__ == '__main__':
-    init_mock_configs()
+    # 2. Strict Platform Locks
+    if not IS_LINUX:
+        print("\n" + "="*60)
+        print("[-] CRITICAL ERROR: THIS DASHBOARD MUST RUN ON LINUX HOSTS.")
+        print("    HiveOS requires direct integration with sysfs and native CLI tools.")
+        print("="*60 + "\n")
+        os._exit(1)
+        
+    if not os.path.exists(HIVE_CONFIG_DIR):
+        print("\n" + "="*60)
+        print("[-] CRITICAL ERROR: HIVEOS CONFIG DIRECTORY NOT DETECTED (/hive-config/).")
+        print("    This software runs exclusively on live standard HiveOS rig nodes.")
+        print("="*60 + "\n")
+        os._exit(1)
+
     app.config['ACCESS_PIN'] = load_or_generate_pin()
     
     local_ip = get_local_ip()
     port = 1337
     
-    # Check gevent/waitress production servers
     try:
         from waitress import serve
         USE_WAITRESS = True
     except ImportError:
         USE_WAITRESS = False
 
-    print("\n" + "="*50)
+    print("\n" + "="*60)
     print("      HIVEOS LOCAL GPU DASHBOARD (PORT 1337)")
-    print("="*50)
-    if not HAS_HIVEOS:
-        print(" -> STATUS: Running in DEMO MODE (Non-HiveOS host detected)")
-        print(" -> MOCK FILES: Settings generated in script directory")
-    else:
-        print(" -> STATUS: Running in PRODUCTION MODE (HiveOS host detected)")
-        print(" -> CONFIGS: Reading/Writing from /hive-config/")
+    print("="*60)
+    print(" -> STATUS: Running in PRODUCTION MODE (HiveOS host verified)")
+    print(" -> CONFIGS: Reading/Writing from /hive-config/")
     print(f" -> ACCESS PIN: {app.config['ACCESS_PIN']}")
     print(f" -> DASHBOARD ADDRESS: http://{local_ip}:{port}")
-    print("="*50 + "\n")
+    print("="*60 + "\n")
     
     if USE_WAITRESS:
         logging.info(f"Starting Waitress production WSGI server on http://{local_ip}:{port}")

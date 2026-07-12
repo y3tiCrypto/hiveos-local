@@ -41,9 +41,7 @@ Because this software interfaces directly with hardware clocks and runs as `root
   - Access the server using the VPN-assigned IP address.
 
 ### 3.2. Access PIN Management
-- **PIN Location**: The generated access PIN is stored in plaintext inside:
-  - `/hive-config/dashboard.key` (when running on HiveOS rigs).
-  - `./dashboard.key` (when running in Demo Mode).
+- **PIN Location**: The generated access PIN is stored in plaintext inside `/hive-config/dashboard.key` on HiveOS rigs.
 - **File System Permissions**: On a real HiveOS rig, the installation script automatically restricts read/write permissions on the key file using `chmod 600`. Only the root user can view the PIN on the host machine.
 - **PIN Rotation**: If your PIN is compromised or you want to rotate it, run these commands inside the host terminal:
   ```bash
@@ -58,12 +56,14 @@ Because this software interfaces directly with hardware clocks and runs as `root
   ```
 
 ### 3.3. Restricting Sudo Privileges
-- **Running context**: The background service `hiveos-local` runs as the `root` user by default. This is required because querying metrics (e.g., reading card stats from `sysfs` or running `nvidia-smi` to read power draw) and executing GPU settings (`nvidia-oc` and `amd-oc`) requires root-level hardware interface access.
+- **Running context**: The background service `hiveos-local` runs as the `root` user by default. This is required because querying metrics (e.g., reading card stats from `sysfs` or running `nvidia-smi` to read power draw), toggling CPU hugepages, controlling miner states, and executing GPU settings (`nvidia-oc` and `amd-oc`) requires root-level hardware interface access.
 - **Guideline**: Do not edit the systemd unit `ExecStart` parameters to run as a standard user unless you have specifically configured `sudoers` passwordless permissions for:
   - `/usr/bin/nvidia-smi`
   - `/hive/sbin/nvidia-oc`
   - `/hive/sbin/amd-oc`
-  - `/hive-config/nvidia-oc.conf` and `/hive-config/amd-oc.conf` (write access)
+  - `/hive/bin/hugepages`
+  - `/hive/bin/miner`
+  - `/hive-config/` configuration files (write access)
 
 ---
 

@@ -140,6 +140,45 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Miner Control Helper
+    async function sendMinerControl(action, buttonId) {
+        const btn = document.getElementById(buttonId);
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...`;
+        
+        try {
+            const response = await fetch('/api/miner/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: action })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                fetchStats();
+            } else {
+                showToast(data.message || `Failed to ${action} miner.`, false);
+            }
+        } catch (error) {
+            console.error(`Miner control error (${action}):`, error);
+            showToast(`Network error attempting to ${action} miner.`, false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    document.getElementById('minerStartBtn').addEventListener('click', () => sendMinerControl('start', 'minerStartBtn'));
+    document.getElementById('minerStopBtn').addEventListener('click', () => {
+        if (confirm("Are you sure you want to STOP mining operations on this rig?")) {
+            sendMinerControl('stop', 'minerStopBtn');
+        }
+    });
+    document.getElementById('minerRestartBtn').addEventListener('click', () => sendMinerControl('restart', 'minerRestartBtn'));
+
     // 4. Poll for GPU Stats and Rig Config
     fetchStats(); // Initial load
     const statsInterval = setInterval(fetchStats, 5000); // Poll every 5s
@@ -217,13 +256,6 @@ async function fetchStats() {
         
         // Update header & badges
         document.getElementById('localIpAddress').textContent = data.system.local_ip + ':1337';
-        
-        const demoBadge = document.getElementById('demoModeBadge');
-        if (data.system.is_demo) {
-            demoBadge.classList.remove('d-none');
-        } else {
-            demoBadge.classList.add('d-none');
-        }
         
         // Update System Diagnostics Panel
         document.getElementById('statRigId').textContent = data.system.rig_id;
