@@ -198,6 +198,30 @@ async function fetchStats() {
         document.getElementById('statRam').textContent = data.system.ram_used_pct + '% / ' + data.system.ram_total_gb + ' GB';
         document.getElementById('statMiner').textContent = data.system.active_miner;
         document.getElementById('statVersion').textContent = data.system.hive_version;
+
+        // Calculate and Update GPU Overall Summaries
+        let totalHashrate = 0;
+        let totalPower = 0;
+        let sumTemp = 0;
+        let sumFan = 0;
+        let gpuCount = data.gpus.length;
+
+        data.gpus.forEach(gpu => {
+            totalHashrate += gpu.hashrate;
+            totalPower += gpu.power;
+            sumTemp += gpu.temp;
+            sumFan += gpu.fan;
+        });
+
+        let avgTemp = gpuCount > 0 ? (sumTemp / gpuCount).toFixed(1) : 0;
+        let avgFan = gpuCount > 0 ? (sumFan / gpuCount).toFixed(1) : 0;
+
+        document.getElementById('statGpuCount').textContent = gpuCount + ' Cards';
+        document.getElementById('statTotalHashrate').textContent = totalHashrate.toFixed(2) + ' MH/s';
+        document.getElementById('statAvgTemp').textContent = avgTemp + ' °C';
+        document.getElementById('statAvgFan').textContent = avgFan + ' %';
+        document.getElementById('statTotalPower').textContent = totalPower.toFixed(1) + ' W';
+        document.getElementById('statCoin').textContent = data.system.coin || 'Unknown';
         
         // Render GPU cards
         renderGpus(data.gpus);

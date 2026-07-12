@@ -18,6 +18,7 @@ HIVE_CONFIG_DIR = "/hive-config"
 RIG_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "rig.conf")
 NVIDIA_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "nvidia-oc.conf")
 AMD_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "amd-oc.conf")
+WALLET_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "wallet.conf")
 
 # Check environment
 IS_LINUX = platform.system() == "Linux"
@@ -27,6 +28,7 @@ HAS_HIVEOS = IS_LINUX and os.path.exists(HIVE_CONFIG_DIR)
 MOCK_NVIDIA_OC_CONF = "./mock_nvidia-oc.conf"
 MOCK_AMD_OC_CONF = "./mock_amd-oc.conf"
 MOCK_RIG_CONF = "./mock_rig.conf"
+MOCK_WALLET_CONF = "./mock_wallet.conf"
 
 # Access PIN Key Path
 PIN_PATH = os.path.join(HIVE_CONFIG_DIR, "dashboard.key") if HAS_HIVEOS else "./dashboard.key"
@@ -72,6 +74,9 @@ def get_nvidia_oc_path():
 def get_amd_oc_path():
     return AMD_OC_CONF if HAS_HIVEOS else MOCK_AMD_OC_CONF
 
+def get_wallet_config_path():
+    return WALLET_CONF_PATH if HAS_HIVEOS else MOCK_WALLET_CONF
+
 # Load or generate access authentication PIN
 def load_or_generate_pin():
     with config_lock:
@@ -100,6 +105,9 @@ def load_or_generate_pin():
 def init_mock_configs():
     if not HAS_HIVEOS:
         with config_lock:
+            if not os.path.exists(MOCK_WALLET_CONF):
+                with open(MOCK_WALLET_CONF, 'w') as f:
+                    f.write('COIN="KAS"\n')
             if not os.path.exists(MOCK_RIG_CONF):
                 with open(MOCK_RIG_CONF, 'w') as f:
                     f.write(
@@ -211,6 +219,9 @@ def get_system_stats():
     stats["farm_hash"] = rig_conf.get("FARM_HASH", "Not Found")
     stats["hive_version"] = rig_conf.get("HIVE_VERSION", "Demo-v0.6")
     stats["active_miner"] = rig_conf.get("MINER", "lolminer")
+
+    wallet_conf = parse_shell_config(get_wallet_config_path())
+    stats["coin"] = wallet_conf.get("COIN", "Unknown")
 
     if IS_LINUX:
         try:
