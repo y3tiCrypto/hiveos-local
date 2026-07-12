@@ -16,17 +16,17 @@ echo "[+] Detected installation directory: $DIR"
 echo "[+] Checking/Installing Python3 dependencies (Flask, Waitress)..."
 if command -v apt-get &> /dev/null; then
   apt-get update -y && apt-get install -y python3-flask python3-pip
-  # Try to install waitress via apt or pip
-  apt-get install -y python3-waitress || python3 -m pip install waitress
+  # Try to install waitress via apt or pip requirements
+  apt-get install -y python3-waitress || python3 -m pip install -r "$DIR/requirements.txt"
 else
-  python3 -m pip install flask waitress
+  python3 -m pip install -r "$DIR/requirements.txt"
 fi
 
 # Double check dependencies
 python3 -c "import flask, waitress" &> /dev/null
 if [ $? -ne 0 ]; then
   echo "[+] Attempting force-install of flask/waitress via pip..."
-  python3 -m pip install flask waitress
+  python3 -m pip install -r "$DIR/requirements.txt"
 fi
 
 # 2. Create Systemd Service File

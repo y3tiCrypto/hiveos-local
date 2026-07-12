@@ -37,7 +37,12 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
-During installation, the script will install the Flask and Waitress dependencies, register a systemd daemon (`hiveos-local.service`), and start the server on port `1337`.
+During installation, the script will read dependencies from [requirements.txt](file:///g:/LocalHiveOS/requirements.txt) to check and install the Flask and Waitress packages, register a systemd daemon (`hiveos-local.service`), and start the server on port `1337`.
+
+If you prefer to install packages manually or verify dependencies outside of the shell script, you can run:
+```bash
+pip3 install -r requirements.txt
+```
 
 Once complete, the installer will display the rig's active IP address and the **Access Authorization PIN**. Open any web browser on your local network and navigate to:
 ```
