@@ -1,20 +1,21 @@
 # HiveOS Local GPU Manager (HiveOS-Local)
 
-A lightweight, local, browser-based emergency diagnostics and GPU overclocking manager designed to run side-by-side on rigs powered by **HiveOS** (https://hiveon.com). 
+A lightweight, local, browser-based emergency diagnostics and GPU overclocking manager designed to run side-by-side on rigs powered by **HiveOS** (https://hiveon.com).
 
-When Hiveon's remote API or central cloud servers experience outages, communication between your mining rig and the main HiveOS dashboard breaks, rendering remote management impossible. **HiveOS-Local** bypasses the cloud entirely, hosting a premium, user-friendly control interface directly from the mining rig's local IP address on port **`1337`**.
+When Hiveon's remote API or central cloud servers experience outages, communication between your mining rig and the main HiveOS dashboard breaks, rendering remote management impossible. **HiveOS-Local** bypasses the cloud entirely, hosting a production-grade, secure, and user-friendly control interface directly from the mining rig's local IP address on port **`1337`**.
 
 ---
 
-## Key Features
+## Production-Grade Capabilities
 
-- 🔋 **Zero Cloud Dependencies**: Connects directly to the rig's local web server via its LAN IP address.
-- 🎨 **Premium Modern Design**: Glassmorphic, responsive Bootstrap 5 interface featuring dark mode (default) and light mode toggle.
-- ⚡ **Real-Time Telemetry**: Real-time stats (updates every 5 seconds) for core/memory clock, power limits, fan speeds, temperatures, and hashrate estimation.
-- 📈 **Basic GPU Overclocking**: Interactively modify core clocks (offsets or locked absolute clocks), memory clocks, fan targets, and voltages.
-- ⚙️ **Direct OS Splicing**: Seamlessly reads and updates native HiveOS configuration files (`nvidia-oc.conf`, `amd-oc.conf`, `rig.conf`) and runs system scripts to apply settings immediately.
-- 💡 **Novice-Friendly Documentation**: Built-in tooltips and a clear, detailed guide explaining advanced overclocking terminology in basic terms.
-- 💻 **Automatic Developer Fallback**: Automatically switches to a functional **Demo Mode** with simulated hardware if run on a non-HiveOS system (e.g. Windows/macOS), enabling easy testing and local modification.
+This application is hardened for live environments with the following layers:
+
+1. 🔒 **PIN-Protected Authentication**: To prevent unauthorized users on your local network (LAN) from accessing the dashboard and tampering with clock limits or GPU voltages, the API and web UI are secured with a 6-digit access PIN. This PIN is auto-generated during installation and saved securely in `/hive-config/dashboard.key` (only readable by root).
+2. 🛡️ **Strict Input Sanitization**: All overclock parameters sent to the server are validated against a strict alphanumeric/character whitelist. Any attempt to inject bash meta-characters (like `;`, `&`, `|`, `$`, or backticks) will trigger a security exception, blocking command injection attacks.
+3. 🧵 **Thread-Safe File Syncing**: File writes are synchronized using Python's `threading.Lock()` to prevent file corruption during concurrent operations.
+4. ⚙️ **Production WSGI Backend**: Runs on a multithreaded **Waitress WSGI** production server (handling up to 4 concurrent worker threads) instead of the single-threaded Flask development server.
+5. 🔄 **Fail-safe Rollback**: A backup copy of the overclock configurations (`nvidia-oc.conf.bak` and `amd-oc.conf.bak`) is created before any parameter updates are saved. Rigs can be instantly rolled back to their last-known stable configuration using the "Revert Settings" button.
+6. 📝 **Structured Server Logging**: Critical operations, updates, and authorization failures are written with timestamped severity tags directly to `/var/log/hiveos-local.log` (or local file in Demo Mode).
 
 ---
 
@@ -36,12 +37,13 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
-During installation, the script will install the Flask dependency, register a systemd daemon (`hiveos-local.service`), and start the server on port `1337`.
+During installation, the script will install the Flask and Waitress dependencies, register a systemd daemon (`hiveos-local.service`), and start the server on port `1337`.
 
-Once complete, the installer will display the rig's active IP address. Open any web browser on your local network and navigate to:
+Once complete, the installer will display the rig's active IP address and the **Access Authorization PIN**. Open any web browser on your local network and navigate to:
 ```
 http://<rig-local-ip>:1337
 ```
+Log in using the displayed 6-digit PIN.
 
 ---
 
@@ -97,9 +99,9 @@ Open `http://localhost:1337` in your browser. Any overclocking adjustments you s
 Because this dashboard executes shell scripts and controls hardware voltages:
 
 1. **Firewall Boundaries**: Do not expose port `1337` directly to the open internet. Access the dashboard exclusively via local Wi-Fi / LAN, or use a secure VPN (like WireGuard or OpenVPN) if connecting remotely.
-2. **Network Scans**: HiveOS-Local automatically scans and displays its local network IP during boot so that you don't have to scan ports manually or login to your router dashboard to identify it.
+2. **Access Security**: The 6-digit key PIN restricts admin features. Keep the PIN confidential. To regenerate the PIN at any time, delete `/hive-config/dashboard.key` (or `./dashboard.key` in demo mode) and restart the service.
 
 ---
 
 ## License
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. Copyright (c) 2026 **Y3TI Coding Team**. See `LICENSE` for more information.

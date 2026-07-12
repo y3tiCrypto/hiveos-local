@@ -38,6 +38,9 @@
             </div>
             
             <div class="d-flex flex-wrap gap-2 align-items-center mt-3 mt-md-0">
+                <button id="revertSettingsBtn" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-2 px-3 border border-danger-subtle d-none">
+                    <i class="bi bi-arrow-counterclockwise"></i> Revert Settings
+                </button>
                 <span class="badge bg-success-glow d-flex align-items-center gap-1 py-2 px-3 border border-success">
                     <span class="pulse-indicator"></span> Live Monitoring Active
                 </span>
@@ -318,6 +321,28 @@
                     <span id="toastMessage"></span>
                 </div>
                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(11, 15, 25, 0.96); z-index: 2000; backdrop-filter: blur(15px);">
+        <div class="card glass-card p-4 shadow-lg border border-secondary-subtle" style="max-width: 400px; width: 90%;">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-shield-lock-fill fs-1 text-primary-gradient"></i>
+                </div>
+                <h3 class="fw-bold mb-2">Access PIN Required</h3>
+                <p class="text-muted small mb-4">This local emergency dashboard is PIN protected. Enter the 6-digit access key displayed on the server terminal during installation.</p>
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <input type="password" class="form-control form-control-lg text-center bg-dark-input fw-bold font-monospace" id="loginPin" maxlength="6" placeholder="Enter PIN" autocomplete="current-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mb-2">Authorize Session</button>
+                    <div id="loginError" class="text-danger small mt-2 d-none">
+                        <i class="bi bi-x-circle-fill"></i> Invalid Access PIN. Try again.
+                    </div>
+                </form>
             </div>
         </div>
     </div>

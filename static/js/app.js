@@ -32,7 +32,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 2. Poll for GPU Stats and Rig Config
+    // 2. Authentication Login Handler
+    const loginForm = document.getElementById('loginForm');
+    const loginOverlay = document.getElementById('loginOverlay');
+    const loginError = document.getElementById('loginError');
+    const revertBtn = document.getElementById('revertSettingsBtn');
+
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const pin = document.getElementById('loginPin').value.trim();
+        
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...`;
+        
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin: pin })
+            });
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                loginOverlay.classList.add('d-none');
+                loginError.classList.add('d-none');
+                revertBtn.classList.remove('d-none');
+                showToast("Authorized successfully!", true);
+                fetchStats();
+            } else {
+                loginError.classList.remove('d-none');
+                document.getElementById('loginPin').value = '';
+            }
+        } catch (error) {
+            console.error("Authentication failed:", error);
+            showToast("Network error during authorization check.", false);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "Authorize Session";
+        }
+    });
+
+    // 3. Rollback Backup Configurations Handler
+    revertBtn.addEventListener('click', async function() {
+        if (!confirm("Are you sure you want to revert all GPU settings to the last saved stable backup? This will restore files and apply them to the system.")) {
+            return;
+        }
+        
+        revertBtn.disabled = true;
+        const icon = revertBtn.querySelector('i');
+        icon.className = 'bi bi-arrow-counterclockwise spin-animation';
+        
+        try {
+            const response = await fetch('/api/revert', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                fetchStats();
+            } else {
+                showToast(data.message || "Failed to restore backups.", false);
+            }
+        } catch (error) {
+            console.error("Rollback failed:", error);
+            showToast("Network error trying to restore backup.", false);
+        } finally {
+            revertBtn.disabled = false;
+            icon.className = 'bi bi-arrow-counterclockwise';
+        }
+    });
+
+    // 4. Poll for GPU Stats and Rig Config
     fetchStats(); // Initial load
     const statsInterval = setInterval(fetchStats, 5000); // Poll every 5s
 
@@ -41,17 +115,17 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshBtn.addEventListener('click', () => {
         refreshBtn.disabled = true;
         const icon = refreshBtn.querySelector('i');
-        icon.classList.add('spin-animation');
+        icon.className = 'bi bi-arrow-clockwise spin-animation';
         
         fetchStats().finally(() => {
             setTimeout(() => {
                 refreshBtn.disabled = false;
-                icon.classList.remove('spin-animation');
+                icon.className = 'bi bi-arrow-clockwise';
             }, 800);
         });
     });
 
-    // 3. Form Submit Handlers for Overclocking
+    // 5. Form Submit Handlers for Overclocking
     document.getElementById('nvOcForm').addEventListener('submit', function(e) {
         e.preventDefault();
         submitOverclock(this, 'nvOcModal');
@@ -79,19 +153,30 @@ function showToast(message, isSuccess = true) {
         toastIcon.className = 'bi bi-exclamation-octagon-fill fs-5';
     }
     
-    // Automatically hide after 4 seconds
     setTimeout(() => {
         toastEl.classList.remove('show');
-    }, 4000);
+    }, 4500);
 }
 
 // Fetch stats from backend API
 async function fetchStats() {
     try {
         const response = await fetch('/api/stats');
+        
+        // Handle 401 Unauthorized status
+        if (response.status === 401) {
+            document.getElementById('loginOverlay').classList.remove('d-none');
+            document.getElementById('revertSettingsBtn').classList.add('d-none');
+            return;
+        }
+        
         if (!response.ok) throw new Error("Network response was not ok");
         
         const data = await response.json();
+        
+        // Hide login if active
+        document.getElementById('loginOverlay').classList.add('d-none');
+        document.getElementById('revertSettingsBtn').classList.remove('d-none');
         
         // Save OC data globally to prefill forms
         activeOverclocks = data.overclocks;
@@ -226,7 +311,6 @@ function renderGpus(gpus) {
 
 // Prefill and open the correct modal for the selected GPU
 window.openOcModal = function(brand, index) {
-    // Fill GPU index in placeholders
     const placeholders = document.querySelectorAll('.gpu-index-placeholder');
     placeholders.forEach(el => el.textContent = index);
     
@@ -234,7 +318,6 @@ window.openOcModal = function(brand, index) {
     inputs.forEach(el => el.value = index);
 
     if (brand === "NVIDIA") {
-        // Fetch current NVIDIA OCs from the cached configuration object
         const nvCore = activeOverclocks.nvidia?.core?.[index] || "";
         const nvMem = activeOverclocks.nvidia?.mem?.[index] || "";
         const nvPl = activeOverclocks.nvidia?.pl?.[index] || "";
@@ -248,7 +331,6 @@ window.openOcModal = function(brand, index) {
         const modal = new bootstrap.Modal(document.getElementById('nvOcModal'));
         modal.show();
     } else if (brand === "AMD") {
-        // Fetch current AMD OCs
         const oc = activeOverclocks.amd || {};
         document.getElementById('amdCore').value = (oc.core?.[index] === "0" ? "" : oc.core?.[index]) || "";
         document.getElementById('amdMem').value = (oc.mem?.[index] === "0" ? "" : oc.mem?.[index]) || "";
@@ -270,7 +352,6 @@ async function submitOverclock(formElement, modalId) {
     const formData = new FormData(formElement);
     const payload = {};
     
-    // Build JSON payload from form fields, setting blanks to "0" (HiveOS default)
     formData.forEach((value, key) => {
         if (key === 'index') {
             payload[key] = parseInt(value);
@@ -299,10 +380,8 @@ async function submitOverclock(formElement, modalId) {
         
         if (response.ok && data.success) {
             showToast(data.message, true);
-            // Hide the modal
             const modalInstance = bootstrap.Modal.getInstance(document.getElementById(modalId));
             modalInstance.hide();
-            // Refresh stats to display new values immediately
             fetchStats();
         } else {
             showToast(data.message || "Failed to apply overclock parameters.", false);
