@@ -106,6 +106,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Toggle Huge Pages Handler
+    const toggleHpBtn = document.getElementById('toggleHugepagesBtn');
+    toggleHpBtn.addEventListener('click', async function() {
+        const currentStatus = document.getElementById('hugePagesStatus').textContent.trim();
+        const enable = currentStatus !== "Enabled";
+        
+        toggleHpBtn.disabled = true;
+        const icon = toggleHpBtn.querySelector('i');
+        icon.className = 'bi bi-gear-fill spin-animation';
+        
+        try {
+            const response = await fetch('/api/hugepages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enable: enable })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                fetchStats();
+            } else {
+                showToast(data.message || "Failed to configure Huge Pages.", false);
+            }
+        } catch (error) {
+            console.error("Huge Pages toggle failed:", error);
+            showToast("Network error trying to toggle Huge Pages.", false);
+        } finally {
+            toggleHpBtn.disabled = false;
+            icon.className = 'bi bi-gear-fill';
+        }
+    });
+
     // 4. Poll for GPU Stats and Rig Config
     fetchStats(); // Initial load
     const statsInterval = setInterval(fetchStats, 5000); // Poll every 5s
@@ -223,6 +257,23 @@ async function fetchStats() {
         document.getElementById('statTotalPower').textContent = totalPower.toFixed(1) + ' W';
         document.getElementById('statCoin').textContent = data.system.coin || 'Unknown';
         
+        // Update CPU Mining Panel
+        document.getElementById('cpuModelName').textContent = data.system.cpu.model;
+        document.getElementById('cpuTemp').textContent = data.system.cpu.temp + ' °C';
+        
+        const hpStatus = document.getElementById('hugePagesStatus');
+        if (data.system.cpu.hugepages) {
+            hpStatus.textContent = "Enabled";
+            hpStatus.className = "stat-value text-success";
+        } else {
+            hpStatus.textContent = "Disabled";
+            hpStatus.className = "stat-value text-danger";
+        }
+        
+        const hashrate = data.system.cpu.hashrate;
+        const formattedHash = hashrate > 1000 ? (hashrate / 1000).toFixed(2) + ' KH/s' : hashrate.toFixed(0) + ' H/s';
+        document.getElementById('cpuHashrateBadge').textContent = formattedHash;
+
         // Render GPU cards
         renderGpus(data.gpus);
         

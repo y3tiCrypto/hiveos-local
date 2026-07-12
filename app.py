@@ -198,6 +198,72 @@ def backup_configs():
         logging.error(f"Failed to create backups of configurations: {e}")
         return False
 
+# CPU Mining States
+MOCK_HUGEPAGES_STATE = True
+
+def get_cpu_model():
+    if IS_LINUX:
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                for line in f:
+                    if line.strip().startswith('model name'):
+                        return line.split(':')[1].strip()
+        except Exception:
+            pass
+    return "AMD Ryzen 9 5900X 12-Core Processor"
+
+def get_cpu_temp():
+    if IS_LINUX:
+        paths = [
+            "/sys/class/thermal/thermal_zone0/temp",
+            "/sys/class/hwmon/hwmon0/temp1_input",
+            "/sys/class/hwmon/hwmon1/temp1_input"
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, 'r') as f:
+                        temp = int(f.read().strip())
+                        if temp > 1000:
+                            temp = int(temp / 1000)
+                        return temp
+                except Exception:
+                    pass
+    return 45 # Default fallback
+
+def check_hugepages_status():
+    global MOCK_HUGEPAGES_STATE
+    if not HAS_HIVEOS:
+        return MOCK_HUGEPAGES_STATE
+    if IS_LINUX:
+        try:
+            with open('/proc/meminfo', 'r') as f:
+                content = f.read()
+            match = re.search(r'HugePages_Total:\s+(\d+)', content)
+            if match and int(match.group(1)) > 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+def get_xmrig_hashrate():
+    if not HAS_HIVEOS:
+        hp = check_hugepages_status()
+        return 12850.5 if hp else 6425.2
+    
+    log_path = "/var/log/miner/xmrig/lastrun_noappend.log"
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, 'r') as f:
+                lines = f.readlines()[-50:]
+            for line in reversed(lines):
+                match = re.search(r'speed \S+ \s*([0-9\.]+)\s+([0-9\.]+)', line)
+                if match:
+                    return float(match.group(1))
+        except Exception:
+            pass
+    return 0.0
+
 # System stats query
 def get_system_stats():
     stats = {
@@ -211,7 +277,13 @@ def get_system_stats():
         "rig_id": "Offline",
         "farm_hash": "Offline",
         "hive_version": "Local-1.0",
-        "active_miner": "None"
+        "active_miner": "None",
+        "cpu": {
+            "model": get_cpu_model(),
+            "temp": get_cpu_temp(),
+            "hugepages": check_hugepages_status(),
+            "hashrate": get_xmrig_hashrate()
+        }
     }
 
     rig_conf = parse_shell_config(get_rig_config_path())
@@ -599,6 +671,30 @@ def revert_overclock():
     except Exception as e:
         logging.error(f"Failed to revert configuration: {e}")
         return jsonify({"success": False, "message": f"Failed to restore configs: {str(e)}"}), 500
+
+@app.route('/api/hugepages', methods=['POST'])
+def toggle_hugepages():
+    global MOCK_HUGEPAGES_STATE
+    data = request.get_json()
+    enable = data.get("enable", True) if data else True
+    
+    if not HAS_HIVEOS:
+        MOCK_HUGEPAGES_STATE = enable
+        msg = "Huge Pages enabled (Simulated)" if enable else "Huge Pages disabled (Simulated)"
+        logging.info(msg)
+        return jsonify({"success": True, "message": msg})
+        
+    action = "enable" if enable else "disable"
+    cmd = f"sudo /hive/bin/hugepages {action}"
+    stdout, stderr, code = run_command(cmd)
+    
+    if code == 0:
+        msg = f"Huge Pages successfully {action}d!"
+        logging.info(msg)
+        return jsonify({"success": True, "message": msg})
+    else:
+        logging.error(f"Failed to configure Huge Pages: {stderr}")
+        return jsonify({"success": False, "message": f"Failed to configure Huge Pages: {stderr}"}), 500
 
 @app.route('/api/stats')
 def api_stats():

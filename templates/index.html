@@ -163,6 +163,47 @@
             </div>
         </section>
 
+        <!-- CPU Mining Section -->
+        <section class="row g-4 mb-4">
+            <div class="col-md-12">
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 fw-bold mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-cpu text-info"></i> CPU Mining & Tuning
+                            </h2>
+                            <span id="cpuHashrateBadge" class="badge bg-accent-glow text-primary fw-bold font-monospace">0 H/s</span>
+                        </div>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="stat-box">
+                                    <span class="stat-label">Processor</span>
+                                    <span id="cpuModelName" class="stat-value text-secondary-emphasis mb-0" style="font-size: 0.95rem;">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="stat-box">
+                                    <span class="stat-label">CPU Temp</span>
+                                    <span id="cpuTemp" class="stat-value">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="stat-box">
+                                    <span class="stat-label">Huge Pages</span>
+                                    <span id="hugePagesStatus" class="stat-value text-warning">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-md-end">
+                                <button id="toggleHugepagesBtn" class="btn btn-outline-warning fw-semibold px-4 py-2 d-flex align-items-center gap-2 ms-auto">
+                                    <i class="bi bi-gear-fill"></i> Toggle Huge Pages
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Overclocking Quick Guide -->
         <section class="card glass-card mb-5">
             <div class="card-body">
