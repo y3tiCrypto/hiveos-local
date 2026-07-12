@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+mock_nvidia-oc.conf
+mock_amd-oc.conf
+mock_rig.conf
+.DS_Store
+.idea/
+.vscode/
+venv/
+env/

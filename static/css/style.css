@@ -1,0 +1,279 @@
+/* Style variables and themes */
+:root {
+    --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    
+    /* Dark Theme Colors (Default) */
+    --bg-main: #0b0f19;
+    --bg-card: rgba(22, 28, 45, 0.6);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    
+    /* Glow/Accent Colors */
+    --accent-glow: rgba(99, 102, 241, 0.15);
+    --success-glow: rgba(16, 185, 129, 0.15);
+    --warning-glow: rgba(245, 158, 11, 0.15);
+    --danger-glow: rgba(239, 68, 68, 0.15);
+    
+    /* Brand Gradients */
+    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --secondary-gradient: linear-gradient(135deg, #475569 0%, #334155 100%);
+}
+
+/* Light Theme overrides */
+[data-bs-theme="light"] {
+    --bg-main: #f8fafc;
+    --bg-card: rgba(255, 255, 255, 0.8);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+    
+    --accent-glow: rgba(99, 102, 241, 0.08);
+    --success-glow: rgba(16, 185, 129, 0.08);
+    --warning-glow: rgba(245, 158, 11, 0.08);
+    --danger-glow: rgba(239, 68, 68, 0.08);
+}
+
+/* Base resets */
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    overflow-x: hidden;
+}
+
+/* Logo and text gradient */
+.text-primary-gradient {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism Cards */
+.glass-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Glowing status colors */
+.bg-success-glow {
+    background-color: var(--success-glow);
+    color: #10b981 !important;
+}
+
+.bg-warning-glow {
+    background-color: var(--warning-glow);
+    color: #f55e0b !important;
+}
+
+.bg-danger-glow {
+    background-color: var(--danger-glow);
+    color: #ef4444 !important;
+}
+
+.bg-accent-glow {
+    background-color: var(--accent-glow);
+    color: #6366f1 !important;
+}
+
+/* Pulser indicator for live state */
+.pulse-indicator {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulse 1.6s infinite;
+    margin-right: 4px;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+/* Diagnostic Stat Boxes */
+.stat-box {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+/* GPU Card Header Brand colors */
+.gpu-header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+}
+
+.brand-nvidia {
+    color: #76b900;
+    font-weight: 700;
+}
+
+.brand-amd {
+    color: #ed1c24;
+    font-weight: 700;
+}
+
+/* Metric Bars */
+.metric-row {
+    margin-bottom: 10px;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.progress-bar-glow-green {
+    background: var(--success-gradient);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.progress-bar-glow-red {
+    background: var(--danger-gradient);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.progress-bar-glow-primary {
+    background: var(--primary-gradient);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+}
+
+/* Guide box for novice help */
+.guide-box {
+    background: rgba(0, 0, 0, 0.1);
+    border-left: 3px solid #6366f1;
+    padding: 16px;
+    border-radius: 0 10px 10px 0;
+    height: 100%;
+}
+
+.guide-box ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.guide-box ul li {
+    margin-bottom: 8px;
+}
+
+.guide-box ul li:last-child {
+    margin-bottom: 0;
+}
+
+/* Theme Toggle Button styling */
+.btn-theme-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-gradient);
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-theme-toggle:hover {
+    transform: scale(1.1) rotate(15deg);
+    color: #e2e8f0;
+}
+
+/* Glass Modals */
+.glass-modal {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 18px;
+}
+
+[data-bs-theme="light"] .glass-modal {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.bg-dark-input {
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px;
+}
+
+.bg-dark-input:focus {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Toast positioning and aesthetics */
+.toast {
+    background: rgba(30, 41, 59, 0.85) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-bs-theme="light"] .toast {
+    background: rgba(255, 255, 255, 0.9) !important;
+}
