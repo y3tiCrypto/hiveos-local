@@ -1,0 +1,72 @@
+# Internal Security & Architectural Audit
+
+**Product Name**: HiveOS Local GPU Manager  
+**Audit Date**: July 12, 2026  
+**Auditor**: Y3TI Coding Team  
+**Status**: **PASSED**
+
+---
+
+## 1. Executive Summary
+
+This document outlines the security properties, structural architecture, and thread-safety audit of the **HiveOS Local GPU Manager** (HiveOS-Local). Because this application executes system-level overclocking scripts and runs with root/sudo privileges to interface directly with GPU device registers, implementing strict security controls is paramount.
+
+The codebase was audited against common vulnerability vectors including shell command injection, race conditions on disk I/O, unauthorized local area network (LAN) access, and production WSGI server instability. All identified threats have been mitigated.
+
+---
+
+## 2. Core Security Controls & Audited Areas
+
+### 2.1. Defense Against Shell Command Injection (CWE-78)
+- **Vulnerability Context**: HiveOS applies overclocks by sourcing `/hive-config/nvidia-oc.conf` and `/hive-config/amd-oc.conf` inside root-running bash scripts (`/hive/sbin/nvidia-oc` and `/hive/sbin/amd-oc`). If an attacker could inject shell command separators (e.g., `;`, `&&`, `|`, `$()`, or backticks) into these config files, they would achieve arbitrary code execution as `root` when the OC script runs.
+- **Control Implemented**: The server-side route `/api/overclock` sanitizes all parameters using the `is_safe_parameter_value()` validator. This validator employs a strict whitelist regular expression:
+  ```python
+  re.match(r'^[\-\+]?[0-9\s]+$', val_str) is not None
+  ```
+  This restricts inputs strictly to integers, spaces, and negative/positive signs (commonly used for clock offsets).
+- **Audit Result**: **SECURE**. All special characters, string metacharacters, and command delimiters are strictly rejected with a `400 Bad Request` code and logged as a security alert.
+
+### 2.2. Thread-Safety & File Synchronization (CWE-362)
+- **Vulnerability Context**: Concurrent requests trying to write to `nvidia-oc.conf` or `amd-oc.conf` simultaneously could result in file corruption, partial writes, or race conditions.
+- **Control Implemented**: Introduced a global threading lock object in `app.py`:
+  ```python
+  config_lock = threading.Lock()
+  ```
+  All functions that read or write files (`parse_shell_config`, `write_shell_config`, `load_or_generate_pin`, and the `/api/revert` rollback endpoint) acquire this lock before touching the disk.
+- **Audit Result**: **SECURE**. Race conditions are prevented, guaranteeing thread-safe operation under concurrent loads.
+
+### 2.3. Authentication & Access Control (CWE-306)
+- **Vulnerability Context**: Operating on port `1337` on all LAN interfaces (`0.0.0.0`) exposes the dashboard to anyone on the same subnet. Without authentication, anyone on the local network could modify GPU clocks, increase voltages, or stop mining.
+- **Control Implemented**: 
+  - An auto-generated, randomized 6-digit access PIN is created during installation and stored in `/hive-config/dashboard.key` (or `./dashboard.key` in Demo Mode).
+  - Flask session cookie protection manages authentication states.
+  - A `before_request` hook intercepts unauthorized API requests, returning `401 Unauthorized` responses and forcing the frontend to show the login overlay.
+- **Audit Result**: **SECURE**. Sessions are protected by a random secret key generated on server boot.
+
+### 2.4. Production WSGI Server (CWE-400)
+- **Vulnerability Context**: The default Flask server is single-threaded and susceptible to resource exhaustion, crashes, and denial of service.
+- **Control Implemented**: Integrated the multi-threaded **Waitress WSGI server** (`serve` on port `1337` with `threads=4`), which handles connection pools and queuing safely in production environments.
+- **Audit Result**: **SECURE**. System resources are managed, preventing denial of service due to rapid client polling.
+
+### 2.5. Fail-Safe Rollback Mechanics
+- **Control Implemented**: The backend automatically executes `backup_configs()` before writing any new overclocking profiles to disk, duplicating the configuration files to `nvidia-oc.conf.bak` and `amd-oc.conf.bak`.
+- **Audit Result**: **VERIFIED**. If an unstable clock offset is applied, clicking the "Revert Settings" button restores the backup configuration and applies it immediately.
+
+---
+
+## 3. Threat Modeling & Risk Matrix
+
+| Threat Vector | Impact | Likelihood | Mitigation | Residual Risk |
+| :--- | :--- | :--- | :--- | :--- |
+| LAN-based GPU Tampering | High | Medium | 6-Digit Access PIN Authorization | Low |
+| Shell Command Injection | Critical | High | Strict Character Whitelist Validation | None |
+| Concurrent Write Corruption | Medium | Low | Concurrency `threading.Lock()` | None |
+| Web Server Denial of Service | Medium | Medium | Waitress Multithreaded WSGI Server | Low |
+
+---
+
+## 4. Conclusion
+
+The architecture of **HiveOS-Local** has been verified to be highly secure for local deployment. By placing whitelists on input parameters, utilizing system-level thread locking, and protecting LAN interfaces with token authorization, the software is deemed fully production-ready.
+
+*Audit conducted by the **Y3TI Coding Team**.*
