@@ -105,3 +105,7 @@ Because this dashboard executes shell scripts and controls hardware voltages:
 
 ## License
 Distributed under the MIT License. Copyright (c) 2026 **Y3TI Coding Team**. See `LICENSE` for more information.
+
+---
+
+*Note: This software is completely scratch-built by AI, as a way to help HiveOS users at least manage their GPUs.*
