@@ -264,6 +264,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Manual check for updates trigger
+    const manualCheckBtn = document.getElementById('manualCheckUpdateBtn');
+    manualCheckBtn.addEventListener('click', async () => {
+        manualCheckBtn.disabled = true;
+        const icon = manualCheckBtn.querySelector('i');
+        icon.className = 'bi bi-arrow-repeat spin-animation';
+        
+        await checkUpdate(true);
+        
+        setTimeout(() => {
+            manualCheckBtn.disabled = false;
+            icon.className = 'bi bi-arrow-repeat';
+        }, 1000);
+    });
+
     // Reboot / Shutdown bindings
     document.getElementById('rigRebootBtn').addEventListener('click', async () => {
         if (confirm("Are you sure you want to REBOOT this rig? Mining operations will be suspended during reboot.")) {
@@ -496,6 +511,7 @@ async function fetchStats() {
         // Update header & badges
         document.getElementById('localIpAddress').textContent = data.system.local_ip + ':1337';
         document.getElementById('dashboardVersion').textContent = data.system.dashboard_version;
+        document.getElementById('currentVerText').textContent = data.system.dashboard_version;
         
         // Update System Diagnostics Panel
         document.getElementById('statRigId').textContent = data.system.rig_id;
@@ -744,22 +760,34 @@ async function submitOverclock(formElement, modalId) {
 }
 
 // Check for updates on GitHub
-async function checkUpdate() {
+async function checkUpdate(isManual = false) {
     try {
         const response = await fetch('/api/update/check');
-        if (response.status === 401) return;
+        if (response.status === 401) {
+            if (isManual) showToast("Unauthorized. Please authorize your session first.", false);
+            return;
+        }
         
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.update_available) {
                 document.getElementById('remoteVersionText').textContent = 'v' + data.remote_version;
                 document.getElementById('updateBanner').classList.remove('d-none');
+                if (isManual) {
+                    showToast(`New update found! v${data.remote_version} is available.`, true);
+                }
             } else {
                 document.getElementById('updateBanner').classList.add('d-none');
+                if (isManual) {
+                    showToast(`Your dashboard is already up to date (v${data.local_version}).`, true);
+                }
             }
+        } else {
+            if (isManual) showToast("Failed to communicate with update checker API.", false);
         }
     } catch (error) {
         console.error("Failed to check for updates:", error);
+        if (isManual) showToast("Network error checking for updates.", false);
     }
 }
 
