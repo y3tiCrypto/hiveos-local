@@ -7,6 +7,7 @@ import shutil
 import logging
 import threading
 import random
+import urllib.request
 from flask import Flask, jsonify, request, render_template, session
 
 app = Flask(__name__)
@@ -20,6 +21,9 @@ NVIDIA_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "nvidia-oc.conf")
 AMD_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "amd-oc.conf")
 WALLET_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "wallet.conf")
 PIN_PATH = os.path.join(HIVE_CONFIG_DIR, "dashboard.key")
+
+# Local Dashboard Release Version
+VERSION = "1.0.0"
 
 # Verify environments
 IS_LINUX = platform.system() == "Linux"
@@ -203,6 +207,7 @@ def get_system_stats():
         "farm_hash": "Offline",
         "hive_version": "Local-1.0",
         "active_miner": "None",
+        "dashboard_version": VERSION,
         "cpu": {
             "model": get_cpu_model(),
             "temp": get_cpu_temp(),
@@ -555,6 +560,54 @@ def miner_control():
     else:
         logging.error(f"Miner control command failed: {stderr}")
         return jsonify({"success": False, "message": f"Miner command failed: {stderr}"}), 500
+
+@app.route('/api/update/check', methods=['GET'])
+def check_update():
+    try:
+        url = "https://raw.githubusercontent.com/y3tiCrypto/hiveos-local/main/version.txt"
+        req = urllib.request.Request(url, headers={'User-Agent': 'HiveOS-Local-Dashboard'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            remote_ver = response.read().decode('utf-8').strip()
+        
+        update_available = remote_ver != VERSION
+        
+        return jsonify({
+            "success": True,
+            "local_version": VERSION,
+            "remote_version": remote_ver,
+            "update_available": update_available
+        })
+    except Exception as e:
+        logging.warning(f"Failed to check remote version: {e}")
+        return jsonify({
+            "success": False,
+            "local_version": VERSION,
+            "remote_version": "Unknown",
+            "update_available": False,
+            "error": str(e)
+        })
+
+@app.route('/api/update/pull', methods=['POST'])
+def pull_update():
+    logging.info(f"Dashboard update requested by IP: {request.remote_addr}")
+    cwd = os.getcwd()
+    
+    # Add safe directory flag
+    run_command(f"git config --global --add safe.directory {cwd}")
+    
+    stdout_f, stderr_f, code_f = run_command("git fetch --all")
+    stdout_r, stderr_r, code_r = run_command("git reset --hard origin/main")
+    
+    if code_r == 0:
+        msg = "Update successfully pulled from GitHub! Restarting dashboard service..."
+        logging.info(msg)
+        cmd = 'nohup bash -c "sleep 1.5 && sudo systemctl restart hiveos-local.service" > /dev/null 2>&1 &'
+        subprocess.Popen(cmd, shell=True)
+        return jsonify({"success": True, "message": msg})
+    else:
+        err_msg = f"Failed to pull git update: {stderr_r or stderr_f}"
+        logging.error(err_msg)
+        return jsonify({"success": False, "message": err_msg}), 500
 
 @app.route('/api/stats')
 def api_stats():

@@ -59,6 +59,14 @@ The codebase was audited against common vulnerability vectors including shell co
   - The Miner Control API checks action strings against a strict string whitelist: `["start", "stop", "restart"]`. It translates them directly to fixed root scripts: `sudo /hive/bin/miner start` and `sudo /hive/bin/miner stop`.
 - **Audit Result**: **SECURE**. Input validation prevents any external characters from reaching command strings.
 
+### 2.7. Secure Repository Integrity & Update Pulls (CWE-494)
+- **Vulnerability Context**: Allowing users to pull code updates remotely risks execution of tampered payloads or man-in-the-middle download injections.
+- **Control Implemented**:
+  - Update checks read a static version string from raw GitHub files over encrypted HTTPS (`urllib.request` with TLS validation).
+  - Code updates do not download raw zip/tarballs or run unverified scripts. Instead, they use native Git (`git fetch` followed by `git reset --hard origin/main`). This guarantees that only valid, committed revisions matching the owner's remote repository signatures are checked out on the rig.
+  - To prevent directory ownership errors under root contexts, the repository directory is explicitly added to Git's `safe.directory` whitelist before calling the pull route.
+- **Audit Result**: **SECURE**. Update integrity is maintained by Git's cryptographic commit hash chains.
+
 ---
 
 ## 3. Threat Modeling & Risk Matrix

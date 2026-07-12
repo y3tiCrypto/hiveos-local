@@ -47,8 +47,24 @@
                 <div class="badge bg-dark-card border border-secondary-subtle py-2 px-3 text-secondary-emphasis">
                     <i class="bi bi-laptop me-1"></i> <span id="localIpAddress">Scanning...</span>
                 </div>
+                <div class="badge bg-dark-card border border-secondary-subtle py-2 px-3 text-secondary-emphasis">
+                    <i class="bi bi-tag-fill me-1"></i> v<span id="dashboardVersion">1.0.0</span>
+                </div>
             </div>
         </header>
+
+        <!-- Update Available Banner -->
+        <div id="updateBanner" class="alert alert-warning glass-card d-none mb-4 d-flex justify-content-between align-items-center" role="alert">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-cloud-arrow-down-fill fs-5 text-warning"></i>
+                <span>
+                    <strong>Dashboard Update Available!</strong> A newer release (<span id="remoteVersionText">v1.1.0</span>) is available on GitHub.
+                </span>
+            </div>
+            <button id="applyUpdateBtn" class="btn btn-warning btn-sm fw-semibold d-flex align-items-center gap-1">
+                <i class="bi bi-arrow-down-circle-fill"></i> Update Now
+            </button>
+        </div>
 
         <!-- System Overview Panel -->
         <section class="row g-4 mb-4">
@@ -441,6 +457,21 @@
                         <i class="bi bi-x-circle-fill"></i> Invalid Access PIN. Try again.
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Loading Overlay -->
+    <div id="updateOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(10, 10, 15, 0.96); z-index: 3000; backdrop-filter: blur(15px);">
+        <div class="card glass-card p-4 shadow-lg border border-secondary-subtle text-center" style="max-width: 400px; width: 90%;">
+            <div class="card-body">
+                <div class="spinner-border text-warning mb-3" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Updating...</span>
+                </div>
+                <h3 class="fw-bold text-white mb-2">Pulling Code Updates</h3>
+                <p class="text-muted small mb-0">
+                    Resetting config to remote main branch and restarting the local service. Please wait...
+                </p>
             </div>
         </div>
     </div>

@@ -69,6 +69,6 @@ Because this software interfaces directly with hardware clocks and runs as `root
 
 ## 4. Security Philosophy
 
-We build software that respects owner privacy. This emergency utility does not connect to any external cloud API, does not report metrics to remote hosts, and operates fully offline on your LAN boundaries.
+We build software that respects owner privacy. This emergency utility does not report metrics to remote hosts and operates fully offline on your LAN boundaries, except for read-only version check requests sent to `raw.githubusercontent.com` over HTTPS when polling for dashboard code updates.
 
 *Policy compiled by the **Y3TI Coding Team**.*

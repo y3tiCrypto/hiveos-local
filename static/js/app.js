@@ -181,7 +181,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 4. Poll for GPU Stats and Rig Config
     fetchStats(); // Initial load
+    checkUpdate(); // Initial check for dashboard updates on GitHub
     const statsInterval = setInterval(fetchStats, 5000); // Poll every 5s
+    const updateInterval = setInterval(checkUpdate, 600000); // Check updates every 10m
 
     // Manual Refresh button
     const refreshBtn = document.getElementById('refreshStatsBtn');
@@ -207,6 +209,40 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('amdOcForm').addEventListener('submit', function(e) {
         e.preventDefault();
         submitOverclock(this, 'amdOcModal');
+    });
+
+    // Apply update trigger
+    const applyUpdateBtn = document.getElementById('applyUpdateBtn');
+    applyUpdateBtn.addEventListener('click', async function() {
+        if (!confirm("Are you sure you want to pull the latest updates from GitHub and restart the local dashboard? Rigs configurations will reset to main branch head.")) {
+            return;
+        }
+        
+        const overlay = document.getElementById('updateOverlay');
+        overlay.classList.remove('d-none');
+        overlay.classList.add('d-flex');
+        
+        try {
+            const response = await fetch('/api/update/pull', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 6000);
+            } else {
+                overlay.classList.remove('d-flex');
+                overlay.classList.add('d-none');
+                showToast(data.message || "Failed to pull update.", false);
+            }
+        } catch (error) {
+            console.error("Update pull failed:", error);
+            overlay.classList.remove('d-flex');
+            overlay.classList.add('d-none');
+            showToast("Network error trying to pull update.", false);
+        }
     });
 });
 
@@ -256,6 +292,7 @@ async function fetchStats() {
         
         // Update header & badges
         document.getElementById('localIpAddress').textContent = data.system.local_ip + ':1337';
+        document.getElementById('dashboardVersion').textContent = data.system.dashboard_version;
         
         // Update System Diagnostics Panel
         document.getElementById('statRigId').textContent = data.system.rig_id;
@@ -499,5 +536,25 @@ async function submitOverclock(formElement, modalId) {
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
+    }
+}
+
+// Check for updates on GitHub
+async function checkUpdate() {
+    try {
+        const response = await fetch('/api/update/check');
+        if (response.status === 401) return;
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.update_available) {
+                document.getElementById('remoteVersionText').textContent = 'v' + data.remote_version;
+                document.getElementById('updateBanner').classList.remove('d-none');
+            } else {
+                document.getElementById('updateBanner').classList.add('d-none');
+            }
+        }
+    } catch (error) {
+        console.error("Failed to check for updates:", error);
     }
 }
