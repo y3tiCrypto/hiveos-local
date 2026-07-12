@@ -115,7 +115,8 @@ The dashboard offers direct miner lifecycle buttons inside the System Diagnostic
 Because this dashboard executes shell scripts and controls hardware voltages:
 
 1. **Firewall Boundaries**: Do not expose port `1337` directly to the open internet. Access the dashboard exclusively via local Wi-Fi / LAN, or use a secure VPN (like WireGuard or OpenVPN) if connecting remotely.
-2. **Access Security**: The 6-digit key PIN restricts admin features. Keep the PIN confidential. To regenerate the PIN at any time, delete `/hive-config/dashboard.key` and restart the service.
+2. **Plaintext Cookie Warning**: The dashboard serves over plain HTTP on LAN port `1337`. Session cookies and CSRF tokens travel in plaintext. Ensure your local segment is secure (e.g. dedicated mining VLAN) to prevent local session capturing.
+3. **Access Security & Lockout**: The 6-digit key PIN restricts admin features. Inputting 5 failed attempts will temporarily lock out the IP address for 15 minutes. To regenerate the PIN at any time, delete `/hive-config/dashboard.key` and restart the service.
 
 ---
 

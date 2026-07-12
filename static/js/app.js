@@ -1,5 +1,6 @@
 // Global state to store overclock configurations
 let activeOverclocks = {};
+let csrfToken = '';
 
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Theme Toggle Logic
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (response.ok && data.success) {
+                csrfToken = data.csrf_token;
                 loginOverlay.classList.add('d-none');
                 loginError.classList.add('d-none');
                 revertBtn.classList.remove('d-none');
@@ -87,7 +89,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const response = await fetch('/api/revert', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                }
             });
             const data = await response.json();
             
@@ -120,7 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('/api/hugepages', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({ enable: enable })
             });
@@ -151,7 +157,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('/api/miner/control', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({ action: action })
             });
@@ -214,6 +221,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply update trigger
     const applyUpdateBtn = document.getElementById('applyUpdateBtn');
     applyUpdateBtn.addEventListener('click', async function() {
+        const pinInput = document.getElementById('updateVerificationPin');
+        const pin = pinInput.value.trim();
+        if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+            showToast("Please enter a valid 6-digit confirmation PIN.", false);
+            return;
+        }
+        
         if (!confirm("Are you sure you want to pull the latest updates from GitHub and restart the local dashboard? Rigs configurations will reset to main branch head.")) {
             return;
         }
@@ -224,7 +238,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const response = await fetch('/api/update/pull', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ pin: pin })
             });
             const data = await response.json();
             if (response.ok && data.success) {
@@ -515,7 +534,8 @@ async function submitOverclock(formElement, modalId) {
         const response = await fetch('/api/overclock', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
             },
             body: JSON.stringify(payload)
         });

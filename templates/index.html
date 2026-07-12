@@ -54,16 +54,19 @@
         </header>
 
         <!-- Update Available Banner -->
-        <div id="updateBanner" class="alert alert-warning glass-card d-none mb-4 d-flex justify-content-between align-items-center" role="alert">
+        <div id="updateBanner" class="alert alert-warning glass-card d-none mb-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3" role="alert">
             <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-cloud-arrow-down-fill fs-5 text-warning"></i>
                 <span>
                     <strong>Dashboard Update Available!</strong> A newer release (<span id="remoteVersionText">v1.1.0</span>) is available on GitHub.
                 </span>
             </div>
-            <button id="applyUpdateBtn" class="btn btn-warning btn-sm fw-semibold d-flex align-items-center gap-1">
-                <i class="bi bi-arrow-down-circle-fill"></i> Update Now
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <input type="password" id="updateVerificationPin" class="form-control form-control-sm text-center bg-dark-input fw-bold font-monospace" maxlength="6" placeholder="Enter PIN to confirm" style="width: 150px; height: 31px; border: 1px solid rgba(255, 193, 7, 0.4);">
+                <button id="applyUpdateBtn" class="btn btn-warning btn-sm fw-semibold d-flex align-items-center gap-1">
+                    <i class="bi bi-arrow-down-circle-fill"></i> Update Now
+                </button>
+            </div>
         </div>
 
         <!-- System Overview Panel -->

@@ -7,6 +7,7 @@ import shutil
 import logging
 import threading
 import random
+import time
 import urllib.request
 from flask import Flask, jsonify, request, render_template, session
 
@@ -31,6 +32,9 @@ HAS_HIVEOS = IS_LINUX and os.path.exists(HIVE_CONFIG_DIR)
 
 # Thread safety lock for files access
 config_lock = threading.Lock()
+
+# IP failed logins tracker for rate-limiting
+failed_login_attempts = {}
 
 # 1. Setup Structured Production Logging
 log_file = '/var/log/hiveos-local.log' if HAS_HIVEOS else './hiveos-local.log'
@@ -124,6 +128,84 @@ def is_safe_parameter_value(value):
     if not val_str:
         return True
     return re.match(r'^[\-\+]?[0-9\s]+$', val_str) is not None
+
+# Overclock Parameters range check validation
+def validate_overclock_ranges(brand, data):
+    try:
+        if brand == "NVIDIA":
+            if "core" in data and data["core"] != "":
+                val = int(data["core"])
+                if val > 500:
+                    if not (500 <= val <= 3000):
+                        return False, "NVIDIA locked core clock must be between 500 and 3000 MHz."
+                else:
+                    if not (-1000 <= val <= 1000):
+                        return False, "NVIDIA core clock offset must be between -1000 and 1000 MHz."
+                        
+            if "mem" in data and data["mem"] != "":
+                val = int(data["mem"])
+                if not (-2000 <= val <= 4000):
+                    return False, "NVIDIA memory clock offset must be between -2000 and 4000 MHz."
+                    
+            if "pl" in data and data["pl"] != "":
+                val = int(data["pl"])
+                if not (0 <= val <= 600):
+                    return False, "NVIDIA power limit must be between 0 and 600 Watts."
+                    
+            if "fan" in data and data["fan"] != "":
+                val = int(data["fan"])
+                if not (0 <= val <= 100):
+                    return False, "NVIDIA fan speed must be between 0 and 100%."
+                    
+        elif brand == "AMD":
+            if "core" in data and data["core"] != "":
+                val = int(data["core"])
+                if not (0 <= val <= 3000):
+                    return False, "AMD core clock must be between 0 and 3000 MHz."
+                    
+            if "mem" in data and data["mem"] != "":
+                val = int(data["mem"])
+                if not (0 <= val <= 3000):
+                    return False, "AMD memory clock must be between 0 and 3000 MHz."
+                    
+            if "vdd" in data and data["vdd"] != "":
+                val = int(data["vdd"])
+                if not (0 <= val <= 1500):
+                    return False, "AMD core voltage (VDD) must be between 0 and 1500 mV."
+                    
+            if "vddci" in data and data["vddci"] != "":
+                val = int(data["vddci"])
+                if not (0 <= val <= 1500):
+                    return False, "AMD VDDCI voltage must be between 0 and 1500 mV."
+                    
+            if "mvdd" in data and data["mvdd"] != "":
+                val = int(data["mvdd"])
+                if not (0 <= val <= 2000):
+                    return False, "AMD memory voltage (MVDD) must be between 0 and 2000 mV."
+                    
+            if "fan" in data and data["fan"] != "":
+                val = int(data["fan"])
+                if not (0 <= val <= 100):
+                    return False, "AMD fan speed must be between 0 and 100%."
+                    
+            if "pl" in data and data["pl"] != "":
+                val = int(data["pl"])
+                if not (0 <= val <= 500):
+                    return False, "AMD power limit must be between 0 and 500 Watts."
+                    
+            if "dpm" in data and data["dpm"] != "":
+                val = int(data["dpm"])
+                if not (0 <= val <= 7):
+                    return False, "AMD DPM state must be between 0 and 7."
+                    
+            if "ref" in data and data["ref"] != "":
+                val = int(data["ref"])
+                if not (0 <= val <= 100):
+                    return False, "AMD memory refresh index (REF) must be between 0 and 100."
+                    
+        return True, ""
+    except ValueError:
+        return False, "Overclock parameters must be valid integers."
 
 # Create backup files of current config files
 def backup_configs():
@@ -268,7 +350,6 @@ def run_command(cmd):
 def get_gpu_stats():
     gpus = []
     
-    # 1. NVIDIA telemetry
     if HAS_HIVEOS or IS_LINUX:
         stdout, stderr, code = run_command("nvidia-smi --query-gpu=index,name,temperature.gpu,fan.speed,power.draw,utilization.gpu,clocks.current.graphics,clocks.current.memory,power.limit --format=csv,noheader,nounits")
         if code == 0 and stdout:
@@ -289,10 +370,9 @@ def get_gpu_stats():
                         "utilization": int(parts[5]),
                         "core_clock": int(parts[6]),
                         "mem_clock": int(parts[7]),
-                        "hashrate": 0.0 # live hashrate must be read from miners; setting default
+                        "hashrate": 0.0
                     })
 
-    # 2. AMD telemetry
     if HAS_HIVEOS or IS_LINUX:
         if os.path.exists("/sys/class/drm"):
             cards = [d for d in os.listdir("/sys/class/drm") if re.match(r'^card\d+$', d)]
@@ -381,28 +461,67 @@ def get_overclocks_formatted():
         }
     }
 
-# Require authentication for all endpoints
+# Require authentication and CSRF token validations for all endpoints
 @app.before_request
 def require_auth():
     if request.path == '/api/login' or request.path.startswith('/static/'):
         return
     if not session.get('authenticated'):
         return jsonify({"success": False, "authenticated": False, "message": "Unauthorized"}), 401
+        
+    # Enforce Anti-CSRF on all POST write actions
+    if request.method == 'POST':
+        token = request.headers.get('X-CSRF-Token')
+        expected = session.get('csrf_token')
+        if not token or not expected or token != expected:
+            logging.warning(f"CSRF Alert: Invalid or missing token from IP {request.remote_addr}")
+            return jsonify({"success": False, "message": "CSRF verification failed."}), 403
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
+    ip = request.remote_addr
+    now = time.time()
+    
+    # Check if currently locked out
+    if ip in failed_login_attempts:
+        record = failed_login_attempts[ip]
+        if record["blocked_until"] > now:
+            remaining = int(record["blocked_until"] - now)
+            logging.warning(f"Blocked login attempt from locked-out IP {ip}. Remaining lockout: {remaining}s")
+            return jsonify({"success": False, "message": f"Too many failed attempts. Try again in {remaining} seconds."}), 429
+            
     data = request.get_json()
     if not data or 'pin' not in data:
         return jsonify({"success": False, "message": "Missing PIN"}), 400
         
     user_pin = str(data['pin']).strip()
     if user_pin == app.config['ACCESS_PIN']:
+        # Reset failure record
+        if ip in failed_login_attempts:
+            del failed_login_attempts[ip]
+            
         session['authenticated'] = True
-        logging.info(f"Authorized login request from IP: {request.remote_addr}")
-        return jsonify({"success": True, "message": "Authenticated successfully!"})
+        # Generate CSRF token
+        csrf_token = os.urandom(16).hex()
+        session['csrf_token'] = csrf_token
+        
+        logging.info(f"Authorized login request from IP: {ip}")
+        return jsonify({"success": True, "message": "Authenticated successfully!", "csrf_token": csrf_token})
     
-    logging.warning(f"Invalid access PIN attempt from IP: {request.remote_addr}")
-    return jsonify({"success": False, "message": "Invalid PIN"}), 401
+    # Log failure and increment counters
+    if ip not in failed_login_attempts:
+        failed_login_attempts[ip] = {"count": 1, "blocked_until": 0.0}
+    else:
+        failed_login_attempts[ip]["count"] += 1
+        
+    record = failed_login_attempts[ip]
+    if record["count"] >= 5:
+        record["blocked_until"] = now + 900.0  # 15 minutes lockout
+        logging.warning(f"IP {ip} locked out for 15 minutes due to 5 failed attempts")
+        return jsonify({"success": False, "message": "Too many failed attempts. Locked out for 15 minutes."}), 429
+        
+    logging.warning(f"Invalid access PIN attempt {record['count']}/5 from IP: {ip}")
+    return jsonify({"success": False, "message": f"Invalid PIN. {5 - record['count']} attempts remaining."}), 401
 
 @app.route('/api/overclock', methods=['POST'])
 def save_overclock():
@@ -416,12 +535,18 @@ def save_overclock():
     if brand not in ["NVIDIA", "AMD"]:
         return jsonify({"success": False, "message": "Invalid brand specification"}), 400
 
-    # Strict Shell-Injection checks
+    # 1. Strict Shell-Injection checks
     for key, val in data.items():
         if key not in ["brand", "index"]:
             if not is_safe_parameter_value(val):
                 logging.warning(f"Security Alert: Blocked shell injection signature on parameter {key}='{val}' from {request.remote_addr}")
                 return jsonify({"success": False, "message": f"Security Alert: Malicious character detected inside value '{val}'"}), 400
+
+    # 2. Clamping bounds check validation
+    is_valid, err_msg = validate_overclock_ranges(brand, data)
+    if not is_valid:
+        logging.warning(f"Overclock range validation failed: {err_msg} from IP {request.remote_addr}")
+        return jsonify({"success": False, "message": err_msg}), 400
 
     # Backup prior configs before editing
     backup_configs()
@@ -589,7 +714,16 @@ def check_update():
 
 @app.route('/api/update/pull', methods=['POST'])
 def pull_update():
-    logging.info(f"Dashboard update requested by IP: {request.remote_addr}")
+    data = request.get_json()
+    if not data or 'pin' not in data:
+        return jsonify({"success": False, "message": "Missing PIN verification parameter"}), 400
+        
+    user_pin = str(data['pin']).strip()
+    if user_pin != app.config['ACCESS_PIN']:
+        logging.warning(f"Failed update PIN verification attempt from IP: {request.remote_addr}")
+        return jsonify({"success": False, "message": "Invalid PIN verification code. Update aborted."}), 401
+
+    logging.info(f"Dashboard update authorized with PIN by IP: {request.remote_addr}")
     cwd = os.getcwd()
     
     # Add safe directory flag

@@ -34,9 +34,10 @@ Please do not open public issues on GitHub for potential security bugs until the
 
 Because this software interfaces directly with hardware clocks and runs as `root` to execute Linux system-level configurations, please follow these guidelines to keep your rigs secure:
 
-### 3.1. Network Isolation (LAN only)
-- **Warning**: Do not expose port `1337` to the open internet. The access PIN is a basic security layer intended for local local subnets and is not designed to withstand brute-force attacks from external actors.
-- **Guideline**: Ensure your local router has firewall rules block port `1337` from external ingress interfaces. If you need to access the dashboard remotely:
+### 3.1. Network Isolation & Plaintext Cookies (LAN only)
+- **Warning**: Do not expose port `1337` to the open internet. 
+- **Plaintext Cookie Notice**: Because the dashboard is served over plain HTTP, the session cookie and CSRF tokens travel in cleartext across the local network segment. If you bridge VLANs or host untrusted devices on the same subnet, attackers could capture session traffic.
+- **Guideline**: Secure the local network segment using dedicated mining VLANs. Ensure your local router has firewall rules blocking port `1337` from external ingress interfaces. If you need to access the dashboard remotely:
   - Connect to the local network using a secure VPN (such as WireGuard, OpenVPN, or Tailscale).
   - Access the server using the VPN-assigned IP address.
 
