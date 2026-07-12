@@ -461,7 +461,7 @@ def save_overclock():
         stdout, stderr, code = run_command("sudo /hive/sbin/nvidia-oc")
         if code != 0:
             logging.error(f"NVIDIA OC script failed: {stderr}")
-            return jsonify({"success": False, "message": f"NVIDIA OC Script execution failed: {stderr}"})
+            return jsonify({"success": False, "message": "NVIDIA overclock script failed to apply settings."})
         
     elif brand == "AMD":
         filepath = AMD_OC_CONF
@@ -487,7 +487,7 @@ def save_overclock():
         stdout, stderr, code = run_command("sudo /hive/sbin/amd-oc")
         if code != 0:
             logging.error(f"AMD OC script failed: {stderr}")
-            return jsonify({"success": False, "message": f"AMD OC Script execution failed: {stderr}"})
+            return jsonify({"success": False, "message": "AMD overclock script failed to apply settings."})
                 
     return jsonify({"success": True, "message": f"Overclock parameters successfully saved and applied to {brand} GPU {gpu_index}!"})
 
@@ -515,7 +515,7 @@ def revert_overclock():
         return jsonify({"success": True, "message": "Overclock settings reverted to previous configuration!"})
     except Exception as e:
         logging.error(f"Failed to revert configuration: {e}")
-        return jsonify({"success": False, "message": f"Failed to restore configs: {str(e)}"}), 500
+        return jsonify({"success": False, "message": "An internal error occurred while trying to restore configurations."}), 500
 
 @app.route('/api/hugepages', methods=['POST'])
 def toggle_hugepages():
@@ -532,7 +532,7 @@ def toggle_hugepages():
         return jsonify({"success": True, "message": msg})
     else:
         logging.error(f"Failed to configure Huge Pages: {stderr}")
-        return jsonify({"success": False, "message": f"Failed to configure Huge Pages: {stderr}"}), 500
+        return jsonify({"success": False, "message": "Failed to configure System Huge Pages."}), 500
 
 @app.route('/api/miner/control', methods=['POST'])
 def miner_control():
@@ -559,7 +559,7 @@ def miner_control():
         return jsonify({"success": True, "message": msg})
     else:
         logging.error(f"Miner control command failed: {stderr}")
-        return jsonify({"success": False, "message": f"Miner command failed: {stderr}"}), 500
+        return jsonify({"success": False, "message": "Miner command failed to execute."}), 500
 
 @app.route('/api/update/check', methods=['GET'])
 def check_update():
@@ -584,7 +584,7 @@ def check_update():
             "local_version": VERSION,
             "remote_version": "Unknown",
             "update_available": False,
-            "error": str(e)
+            "error": "Failed to verify version against GitHub."
         })
 
 @app.route('/api/update/pull', methods=['POST'])
@@ -607,7 +607,7 @@ def pull_update():
     else:
         err_msg = f"Failed to pull git update: {stderr_r or stderr_f}"
         logging.error(err_msg)
-        return jsonify({"success": False, "message": err_msg}), 500
+        return jsonify({"success": False, "message": "Failed to pull dashboard update from GitHub repository."}), 500
 
 @app.route('/api/stats')
 def api_stats():
