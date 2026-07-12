@@ -156,12 +156,12 @@
                         </div>
                         <hr class="my-3 border-secondary-subtle">
                         <div class="row g-3 align-items-center">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="small fw-semibold text-muted text-uppercase letter-spacing-0.05em">Miner Operations:</span>
                                 </div>
                             </div>
-                            <div class="col-md-8 text-md-end">
+                            <div class="col-md-9 text-md-end">
                                 <div class="d-flex flex-wrap gap-2 justify-content-md-end">
                                     <button id="minerStartBtn" class="btn btn-sm btn-success fw-semibold px-3 py-2 d-flex align-items-center gap-1">
                                         <i class="bi bi-play-fill"></i> Start Miner
@@ -171,6 +171,16 @@
                                     </button>
                                     <button id="minerRestartBtn" class="btn btn-sm btn-warning fw-semibold px-3 py-2 d-flex align-items-center gap-1">
                                         <i class="bi bi-arrow-clockwise"></i> Restart Miner
+                                    </button>
+                                    <div class="vr mx-1 bg-secondary opacity-25"></div>
+                                    <button id="viewMinerLogBtn" class="btn btn-sm btn-primary fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-terminal-fill"></i> View Miner Log
+                                    </button>
+                                    <button id="rigRebootBtn" class="btn btn-sm btn-outline-warning fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-power"></i> Reboot Rig
+                                    </button>
+                                    <button id="rigShutdownBtn" class="btn btn-sm btn-outline-danger fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-slash-circle"></i> Shutdown Rig
                                     </button>
                                 </div>
                             </div>
@@ -241,6 +251,109 @@
             </div>
         </section>
 
+        <!-- Services & Tuning and Presets Section -->
+        <section class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card glass-card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+                            <i class="bi bi-shield-fill-check text-warning"></i> Local Rig Services Tuning
+                        </h2>
+                        
+                        <!-- Watchdog Settings Form -->
+                        <form id="watchdogForm" class="mb-4">
+                            <h3 class="h6 fw-bold mb-3 text-secondary-emphasis border-bottom pb-2">
+                                <i class="bi bi-heartpulse text-danger"></i> Hashrate Watchdog
+                            </h3>
+                            <div class="row g-3 align-items-end">
+                                <div class="col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Status</label>
+                                    <select class="form-select form-select-sm bg-dark-input text-white border-secondary-subtle" id="wdEnabled">
+                                        <option value="0">Disabled</option>
+                                        <option value="1">Enabled</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Min Hashrate (MH/s)</label>
+                                    <input type="number" step="0.1" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="wdMinHashrate" placeholder="e.g. 150" required>
+                                </div>
+                                <div class="col-sm-3">
+                                    <button type="submit" class="btn btn-sm btn-warning w-100 py-2 fw-semibold">Save WD</button>
+                                </div>
+                            </div>
+                        </form>
+                        
+                        <!-- Autofan Settings Form -->
+                        <form id="autofanForm">
+                            <h3 class="h6 fw-bold mb-3 text-secondary-emphasis border-bottom pb-2">
+                                <i class="bi bi-fan text-success"></i> Smart Autofan Controls
+                            </h3>
+                            <div class="row g-3">
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Status</label>
+                                    <select class="form-select form-select-sm bg-dark-input text-white border-secondary-subtle" id="afEnabled">
+                                        <option value="0">Disabled</option>
+                                        <option value="1">Enabled</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Target Core Temp (°C)</label>
+                                    <input type="number" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="afTargetCore" min="30" max="90" placeholder="e.g. 60" required>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Target Mem Temp (°C)</label>
+                                    <input type="number" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="afTargetMem" min="40" max="110" placeholder="e.g. 80" required>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Min Fan (%)</label>
+                                    <input type="number" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="afMinFan" min="0" max="100" placeholder="e.g. 30" required>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Max Fan (%)</label>
+                                    <input type="number" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="afMaxFan" min="0" max="100" placeholder="e.g. 100" required>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Critical Temp (°C)</label>
+                                    <input type="number" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="afCriticalTemp" min="50" max="95" placeholder="e.g. 85" required>
+                                </div>
+                                <div class="col-12 text-end">
+                                    <button type="submit" class="btn btn-sm btn-success px-4 py-2 fw-semibold">Save Autofan Settings</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card glass-card h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+                            <i class="bi bi-wallet2 text-primary"></i> Local Profile Presets (Flight Sheets)
+                        </h2>
+                        <p class="text-muted small mb-3">
+                            Save active coins and miner pool configurations as local presets to easily swap configuration setups.
+                        </p>
+                        
+                        <!-- List of presets -->
+                        <div class="flex-grow-1 overflow-auto mb-3" style="max-height: 220px; min-height: 180px;" id="presetsContainer">
+                            <div class="text-center text-muted small py-4">Loading saved presets...</div>
+                        </div>
+                        
+                        <!-- Save Preset Form -->
+                        <form id="savePresetForm" class="border-top border-secondary-subtle pt-3">
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="newPresetName" placeholder="New preset name (e.g. Kaspa Profile)" required>
+                                <button class="btn btn-primary btn-sm fw-semibold" type="submit">
+                                    <i class="bi bi-save2"></i> Save Preset
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Overclocking Quick Guide -->
         <section class="card glass-card mb-5">
             <div class="card-body">
@@ -279,6 +392,27 @@
             <p class="mb-1">HiveOS Local emergency interface dashboard running on port 1337.</p>
             <p class="mb-0">Created to support GPU stability when central servers are offline. Use overclocks responsibly.</p>
         </footer>
+    </div>
+
+    <!-- Miner Log Modal -->
+    <div class="modal fade" id="minerLogModal" tabindex="-1" aria-labelledby="minerLogModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content glass-modal border border-secondary-subtle">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="minerLogModalLabel">
+                        <i class="bi bi-terminal-fill text-primary me-2"></i> Active Miner Console Log (<span id="activeMinerLogName"></span>)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0 bg-black">
+                    <pre id="minerLogConsole" class="text-success p-3 font-monospace mb-0" style="font-size: 0.85rem; min-height: 400px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <span class="text-muted small me-auto"><i class="bi bi-arrow-repeat spin-animation"></i> Polling updates every 2s</span>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Overclock Modal (NVIDIA) -->

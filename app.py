@@ -22,6 +22,8 @@ NVIDIA_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "nvidia-oc.conf")
 AMD_OC_CONF = os.path.join(HIVE_CONFIG_DIR, "amd-oc.conf")
 WALLET_CONF_PATH = os.path.join(HIVE_CONFIG_DIR, "wallet.conf")
 PIN_PATH = os.path.join(HIVE_CONFIG_DIR, "dashboard.key")
+AUTOFAN_CONF = os.path.join(HIVE_CONFIG_DIR, "autofan.conf")
+PRESETS_DIR = os.path.join(HIVE_CONFIG_DIR, "presets")
 
 # Local Dashboard Release Version
 VERSION = "1.0.0"
@@ -36,7 +38,7 @@ config_lock = threading.Lock()
 # IP failed logins tracker for rate-limiting
 failed_login_attempts = {}
 
-# 1. Setup Structured Production Logging
+# Setup Structured Production Logging
 log_file = '/var/log/hiveos-local.log' if HAS_HIVEOS else './hiveos-local.log'
 logging.basicConfig(
     filename=log_file,
@@ -686,6 +688,258 @@ def miner_control():
         logging.error(f"Miner control command failed: {stderr}")
         return jsonify({"success": False, "message": "Miner command failed to execute."}), 500
 
+# 1. System Power Routes (Reboot / Shutdown)
+@app.route('/api/system/reboot', methods=['POST'])
+def system_reboot():
+    logging.info(f"System reboot requested by IP: {request.remote_addr}")
+    cmd = 'nohup bash -c "sleep 1.5 && sudo /hive/sbin/sreboot" > /dev/null 2>&1 &'
+    subprocess.Popen(cmd, shell=True)
+    return jsonify({"success": True, "message": "Reboot command initiated. Rig will restart shortly."})
+
+@app.route('/api/system/shutdown', methods=['POST'])
+def system_shutdown():
+    logging.info(f"System shutdown requested by IP: {request.remote_addr}")
+    cmd = 'nohup bash -c "sleep 1.5 && sudo /hive/sbin/sreboot shutdown" > /dev/null 2>&1 &'
+    subprocess.Popen(cmd, shell=True)
+    return jsonify({"success": True, "message": "Shutdown command initiated. Rig will power down shortly."})
+
+# 2. Miner Console Log Streamer
+@app.route('/api/miner/log', methods=['GET'])
+def get_miner_log():
+    rig_conf = parse_shell_config(RIG_CONF_PATH)
+    miner = rig_conf.get("MINER", "").strip().lower()
+    if not miner or miner == "none":
+        return jsonify({"success": False, "message": "No active miner is configured on this rig."}), 404
+        
+    log_candidates = [
+        f"/var/log/miner/{miner}/{miner}.log",
+        f"/var/log/miner/{miner}/lastrun_noappend.log",
+        f"/var/log/miner/{miner}/lastrun.log",
+    ]
+    
+    log_content = ""
+    found_path = None
+    for p in log_candidates:
+        if os.path.exists(p):
+            found_path = p
+            break
+            
+    if found_path:
+        try:
+            with open(found_path, 'r', errors='ignore') as f:
+                lines = f.readlines()[-150:]
+                log_content = "".join(lines)
+        except Exception as e:
+            logging.error(f"Error reading miner log {found_path}: {e}")
+            return jsonify({"success": False, "message": "Failed to read miner log file."}), 500
+    else:
+        return jsonify({"success": False, "message": f"Log file for miner '{miner}' not found. Verify miner is running."}), 404
+        
+    return jsonify({"success": True, "miner": miner, "log": log_content})
+
+# 3. Watchdog Config Management
+@app.route('/api/watchdog', methods=['GET', 'POST'])
+def handle_watchdog():
+    if request.method == 'GET':
+        rig_conf = parse_shell_config(RIG_CONF_PATH)
+        return jsonify({
+            "success": True,
+            "wd_enabled": rig_conf.get("WD_ENABLED", "0"),
+            "wd_min_hashrate": rig_conf.get("WD_MIN_HASHRATE", "0")
+        })
+        
+    # POST
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Invalid payload"}), 400
+        
+    enabled = str(data.get("wd_enabled", "0")).strip()
+    min_hashrate = str(data.get("wd_min_hashrate", "0")).strip()
+    
+    if enabled not in ["0", "1"]:
+        return jsonify({"success": False, "message": "wd_enabled must be 0 or 1."}), 400
+    if not re.match(r'^[0-9\.]+$', min_hashrate):
+        return jsonify({"success": False, "message": "Min hashrate must be a valid number."}), 400
+        
+    rig_conf = parse_shell_config(RIG_CONF_PATH)
+    rig_conf["WD_ENABLED"] = enabled
+    rig_conf["WD_MIN_HASHRATE"] = min_hashrate
+    
+    if write_shell_config(RIG_CONF_PATH, rig_conf):
+        logging.info(f"Watchdog settings updated by IP: {request.remote_addr} (Enabled={enabled}, Min={min_hashrate})")
+        run_command("sudo /hive/bin/wd restart")
+        return jsonify({"success": True, "message": "Watchdog settings saved and daemon restarted!"})
+    else:
+        return jsonify({"success": False, "message": "Failed to write watchdog settings to rig.conf."}), 500
+
+# 4. Autofan Settings Config
+@app.route('/api/autofan', methods=['GET', 'POST'])
+def handle_autofan():
+    if request.method == 'GET':
+        config = parse_shell_config(AUTOFAN_CONF)
+        return jsonify({
+            "success": True,
+            "enabled": config.get("ENABLED", "0"),
+            "target_temp": config.get("TARGET_TEMP", "60"),
+            "target_mem_temp": config.get("TARGET_MEM_TEMP", "80"),
+            "min_fan": config.get("MIN_FAN", "30"),
+            "max_fan": config.get("MAX_FAN", "100"),
+            "critical_temp": config.get("CRITICAL_TEMP", "85")
+        })
+        
+    # POST
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Invalid payload"}), 400
+        
+    enabled = str(data.get("enabled", "0")).strip()
+    target_temp = str(data.get("target_temp", "60")).strip()
+    target_mem_temp = str(data.get("target_mem_temp", "80")).strip()
+    min_fan = str(data.get("min_fan", "30")).strip()
+    max_fan = str(data.get("max_fan", "100")).strip()
+    critical_temp = str(data.get("critical_temp", "85")).strip()
+    
+    for val in [enabled, target_temp, target_mem_temp, min_fan, max_fan, critical_temp]:
+        if not val.isdigit():
+            return jsonify({"success": False, "message": "All autofan values must be integers."}), 400
+            
+    if enabled not in ["0", "1"]:
+        return jsonify({"success": False, "message": "enabled must be 0 or 1."}), 400
+    if not (30 <= int(target_temp) <= 90):
+        return jsonify({"success": False, "message": "Target core temperature must be between 30 and 90 C."}), 400
+    if not (40 <= int(target_mem_temp) <= 110):
+        return jsonify({"success": False, "message": "Target memory temperature must be between 40 and 110 C."}), 400
+    if not (0 <= int(min_fan) <= 100) or not (0 <= int(max_fan) <= 100):
+        return jsonify({"success": False, "message": "Fan speed limits must be between 0 and 100%."}), 400
+    if int(min_fan) > int(max_fan):
+        return jsonify({"success": False, "message": "Minimum fan speed cannot be greater than maximum fan speed."}), 400
+    if not (50 <= int(critical_temp) <= 95):
+        return jsonify({"success": False, "message": "Critical temperature must be between 50 and 95 C."}), 400
+        
+    config = {
+        "ENABLED": enabled,
+        "TARGET_TEMP": target_temp,
+        "TARGET_MEM_TEMP": target_mem_temp,
+        "MIN_FAN": min_fan,
+        "MAX_FAN": max_fan,
+        "CRITICAL_TEMP": critical_temp,
+        "CRITICAL_TEMP_ACTION": "reboot"
+    }
+    
+    if write_shell_config(AUTOFAN_CONF, config):
+        logging.info(f"Autofan configuration updated by IP: {request.remote_addr}")
+        run_command("sudo /hive/bin/autofan restart")
+        return jsonify({"success": True, "message": "Autofan settings saved and service restarted!"})
+    else:
+        return jsonify({"success": False, "message": "Failed to save autofan.conf"}), 500
+
+# 5. Local Preset Profile Swappers
+@app.route('/api/presets', methods=['GET'])
+def list_presets():
+    presets = []
+    if os.path.exists(PRESETS_DIR):
+        try:
+            presets = [d for d in os.listdir(PRESETS_DIR) if os.path.isdir(os.path.join(PRESETS_DIR, d))]
+        except Exception as e:
+            logging.error(f"Failed to list presets directory: {e}")
+    return jsonify({"success": True, "presets": sorted(presets)})
+
+@app.route('/api/presets/save', methods=['POST'])
+def save_preset():
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({"success": False, "message": "Missing preset name"}), 400
+        
+    name = str(data['name']).strip()
+    if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
+        return jsonify({"success": False, "message": "Invalid preset name. Use alphanumeric characters and spaces only."}), 400
+        
+    preset_path = os.path.join(PRESETS_DIR, name)
+    
+    try:
+        with config_lock:
+            if not os.path.exists(preset_path):
+                os.makedirs(preset_path, exist_ok=True)
+                
+            if os.path.exists(WALLET_CONF_PATH):
+                shutil.copy2(WALLET_CONF_PATH, os.path.join(preset_path, "wallet.conf"))
+            if os.path.exists(os.path.join(HIVE_CONFIG_DIR, "miner.conf")):
+                shutil.copy2(os.path.join(HIVE_CONFIG_DIR, "miner.conf"), os.path.join(preset_path, "miner.conf"))
+                
+            rig_conf = parse_shell_config(RIG_CONF_PATH)
+            write_shell_config(os.path.join(preset_path, "rig_preset.conf"), {
+                "MINER": rig_conf.get("MINER", "none")
+            })
+            
+        logging.info(f"Preset '{name}' saved successfully by IP: {request.remote_addr}")
+        return jsonify({"success": True, "message": f"Preset '{name}' successfully saved!"})
+    except Exception as e:
+        logging.error(f"Failed to save preset '{name}': {e}")
+        return jsonify({"success": False, "message": "Failed to save preset files."}), 500
+
+@app.route('/api/presets/apply', methods=['POST'])
+def apply_preset():
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({"success": False, "message": "Missing preset name"}), 400
+        
+    name = str(data['name']).strip()
+    if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
+        return jsonify({"success": False, "message": "Invalid preset name."}), 400
+        
+    preset_path = os.path.join(PRESETS_DIR, name)
+    if not os.path.exists(preset_path):
+        return jsonify({"success": False, "message": f"Preset '{name}' does not exist."}), 404
+        
+    try:
+        with config_lock:
+            preset_wallet = os.path.join(preset_path, "wallet.conf")
+            preset_miner = os.path.join(preset_path, "miner.conf")
+            preset_rig = os.path.join(preset_path, "rig_preset.conf")
+            
+            if os.path.exists(preset_wallet):
+                shutil.copy2(preset_wallet, WALLET_CONF_PATH)
+            if os.path.exists(preset_miner):
+                shutil.copy2(preset_miner, os.path.join(HIVE_CONFIG_DIR, "miner.conf"))
+                
+            if os.path.exists(preset_rig):
+                p_rig = parse_shell_config(preset_rig)
+                if "MINER" in p_rig:
+                    rig_conf = parse_shell_config(RIG_CONF_PATH)
+                    rig_conf["MINER"] = p_rig["MINER"]
+                    write_shell_config(RIG_CONF_PATH, rig_conf)
+                    
+        logging.info(f"Preset '{name}' applied successfully by IP: {request.remote_addr}. Restarting miner...")
+        run_command("sudo /hive/bin/miner stop && sudo /hive/bin/miner start")
+        return jsonify({"success": True, "message": f"Preset '{name}' applied successfully! Miner restarting..."})
+    except Exception as e:
+        logging.error(f"Failed to apply preset '{name}': {e}")
+        return jsonify({"success": False, "message": "Failed to restore preset configuration files."}), 500
+
+@app.route('/api/presets/delete', methods=['POST'])
+def delete_preset():
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({"success": False, "message": "Missing preset name"}), 400
+        
+    name = str(data['name']).strip()
+    if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
+        return jsonify({"success": False, "message": "Invalid preset name."}), 400
+        
+    preset_path = os.path.join(PRESETS_DIR, name)
+    if not os.path.exists(preset_path):
+        return jsonify({"success": False, "message": "Preset not found."}), 404
+        
+    try:
+        with config_lock:
+            shutil.rmtree(preset_path)
+            
+        logging.info(f"Preset '{name}' deleted successfully by IP: {request.remote_addr}")
+        return jsonify({"success": True, "message": f"Preset '{name}' successfully deleted."})
+    except Exception as e:
+        logging.error(f"Failed to delete preset '{name}': {e}")
+        return jsonify({"success": False, "message": "Failed to remove preset files."}), 500
+
 @app.route('/api/update/check', methods=['GET'])
 def check_update():
     try:
@@ -770,6 +1024,9 @@ if __name__ == '__main__':
         print("    This software runs exclusively on live standard HiveOS rig nodes.")
         print("="*60 + "\n")
         os._exit(1)
+
+    # Initialize presets directory
+    os.makedirs(PRESETS_DIR, exist_ok=True)
 
     app.config['ACCESS_PIN'] = load_or_generate_pin()
     

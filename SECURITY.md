@@ -64,7 +64,10 @@ Because this software interfaces directly with hardware clocks and runs as `root
   - `/hive/sbin/amd-oc`
   - `/hive/bin/hugepages`
   - `/hive/bin/miner`
-  - `/hive-config/` configuration files (write access)
+  - `/hive/bin/wd` (watchdog daemon command control)
+  - `/hive/bin/autofan` (autofan controller restart command)
+  - `/hive/sbin/sreboot` (graceful system reboots and shutdowns)
+  - `/hive-config/` configuration files (presets storage, watchdog configs, autofan configs)
 
 ---
 

@@ -67,6 +67,22 @@ The codebase was audited against common vulnerability vectors including shell co
   - To prevent directory ownership errors under root contexts, the repository directory is explicitly added to Git's `safe.directory` whitelist before calling the pull route.
 - **Audit Result**: **SECURE**. Update integrity is maintained by Git's cryptographic commit hash chains.
 
+### 2.8. System Power Command Isolation (CWE-250)
+- **Control Implemented**: The Reboot and Shutdown endpoints execute only hardcoded local scripts: `sudo /hive/sbin/sreboot` and `sudo /hive/sbin/sreboot shutdown`. No external arguments or variables are passed.
+- **Audit Result**: **SECURE**.
+
+### 2.9. Traversal-Resistant Presets Swapping (CWE-22)
+- **Control Implemented**:
+  - The Presets API validates user-submitted profile names using strict regex `^[A-Za-z0-9_\-\s]+$`.
+  - Directory matching resolves exclusively under `/hive-config/presets/`, preventing path traversal characters (`..`, `/`) from escaping the presets sandbox to access other parts of the filesystem.
+- **Audit Result**: **SECURE**.
+
+### 2.10. Shell-Safety Range Clamping (CWE-20)
+- **Control Implemented**:
+  - Watchdog limits and autofan settings are validated for integer/numeric types and matched against hardcoded min/max thresholds.
+  - Configuration updates run under the global `config_lock` to prevent concurrent write collisions.
+- **Audit Result**: **SECURE**.
+
 ---
 
 ## 3. Threat Modeling & Risk Matrix

@@ -101,12 +101,14 @@ For rigs running CPU miners (e.g. **XMRig**), the dashboard provides real-time C
 
 ---
 
-## Miner Operations Management
+## Miner & Rig Operations Management
 
-The dashboard offers direct miner lifecycle buttons inside the System Diagnostics section:
-- **Start Miner**: Runs `sudo /hive/bin/miner start` as root to boot mining operations.
-- **Stop Miner**: Runs `sudo /hive/bin/miner stop` as root to temporarily suspend active mining processes.
-- **Restart Miner**: Runs `sudo /hive/bin/miner stop && sudo /hive/bin/miner start` to refresh active configurations on the fly.
+The dashboard offers advanced local command options inside the dashboard:
+- **Miner Actions**: Start, stop, or restart the mining daemon directly.
+- **Rig Power Actions**: Gracefully reboot or shutdown the system hardware remotely using whitelisted calls to `/hive/sbin/sreboot`.
+- **Live console log streaming**: Click "View Miner Log" to launch a scrollable terminal streaming your active miner log outputs updated in real-time.
+- **Hashrate Watchdog & Autofan Tuning**: Configure low hashrate reboot conditions and GPU core/memory temperature fan ranges directly on the rig.
+- **Profile Presets (Flight Sheets)**: Save your current configurations as named presets and hot-swap between coins and wallets locally.
 
 ---
 

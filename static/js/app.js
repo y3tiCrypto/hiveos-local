@@ -263,6 +263,187 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast("Network error trying to pull update.", false);
         }
     });
+
+    // Reboot / Shutdown bindings
+    document.getElementById('rigRebootBtn').addEventListener('click', async () => {
+        if (confirm("Are you sure you want to REBOOT this rig? Mining operations will be suspended during reboot.")) {
+            sendSystemPowerAction('/api/system/reboot', 'rigRebootBtn');
+        }
+    });
+    
+    document.getElementById('rigShutdownBtn').addEventListener('click', async () => {
+        if (confirm("Are you sure you want to SHUTDOWN this rig? Power will be cut from the hardware.")) {
+            sendSystemPowerAction('/api/system/shutdown', 'rigShutdownBtn');
+        }
+    });
+    
+    async function sendSystemPowerAction(endpoint, btnId) {
+        const btn = document.getElementById(btnId);
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...`;
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken }
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+            } else {
+                showToast(data.message || "Power command failed.", false);
+            }
+        } catch (error) {
+            console.error("Power action failed:", error);
+            showToast("Network error executing power command.", false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    // Miner logs viewer
+    const logModal = document.getElementById('minerLogModal');
+    let logPollInterval = null;
+    
+    document.getElementById('viewMinerLogBtn').addEventListener('click', () => {
+        const modal = new bootstrap.Modal(logModal);
+        modal.show();
+    });
+    
+    logModal.addEventListener('shown.bs.modal', () => {
+        fetchMinerLog();
+        logPollInterval = setInterval(fetchMinerLog, 2000);
+    });
+    
+    logModal.addEventListener('hidden.bs.modal', () => {
+        if (logPollInterval) {
+            clearInterval(logPollInterval);
+            logPollInterval = null;
+        }
+    });
+    
+    async function fetchMinerLog() {
+        try {
+            const response = await fetch('/api/miner/log');
+            if (response.status === 401) return;
+            const data = await response.json();
+            
+            const consoleEl = document.getElementById('minerLogConsole');
+            if (response.ok && data.success) {
+                document.getElementById('activeMinerLogName').textContent = data.miner.toUpperCase();
+                consoleEl.textContent = data.log || "Log file is currently empty.";
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            } else {
+                consoleEl.textContent = "Error: " + (data.message || "Failed to read logs.");
+            }
+        } catch (error) {
+            document.getElementById('minerLogConsole').textContent = "Failed to reach backend API for logs.";
+        }
+    }
+
+    // Watchdog form submit
+    document.getElementById('watchdogForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        
+        const payload = {
+            wd_enabled: document.getElementById('wdEnabled').value,
+            wd_min_hashrate: document.getElementById('wdMinHashrate').value
+        };
+        
+        try {
+            const response = await fetch('/api/watchdog', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+            } else {
+                showToast(data.message || "Failed to save watchdog.", false);
+            }
+        } catch (error) {
+            showToast("Network error saving watchdog.", false);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+    
+    // Autofan form submit
+    document.getElementById('autofanForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        
+        const payload = {
+            enabled: document.getElementById('afEnabled').value,
+            target_temp: document.getElementById('afTargetCore').value,
+            target_mem_temp: document.getElementById('afTargetMem').value,
+            min_fan: document.getElementById('afMinFan').value,
+            max_fan: document.getElementById('afMaxFan').value,
+            critical_temp: document.getElementById('afCriticalTemp').value
+        };
+        
+        try {
+            const response = await fetch('/api/autofan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+            } else {
+                showToast(data.message || "Failed to save autofan settings.", false);
+            }
+        } catch (error) {
+            showToast("Network error saving autofan settings.", false);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // Save Preset form submit
+    document.getElementById('savePresetForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const input = document.getElementById('newPresetName');
+        const name = input.value.trim();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/presets/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ name: name })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                input.value = '';
+                loadPresetsList();
+            } else {
+                showToast(data.message || "Failed to save preset.", false);
+            }
+        } catch (error) {
+            showToast("Network error saving preset profile.", false);
+        } finally {
+            btn.disabled = false;
+        }
+    });
 });
 
 // Toast notification helper
@@ -303,8 +484,11 @@ async function fetchStats() {
         const data = await response.json();
         
         // Hide login if active
-        document.getElementById('loginOverlay').classList.add('d-none');
-        document.getElementById('revertSettingsBtn').classList.remove('d-none');
+        if (!document.getElementById('loginOverlay').classList.contains('d-none')) {
+            document.getElementById('loginOverlay').classList.add('d-none');
+            document.getElementById('revertSettingsBtn').classList.remove('d-none');
+            loadTuningSettings();
+        }
         
         // Save OC data globally to prefill forms
         activeOverclocks = data.overclocks;
@@ -576,5 +760,135 @@ async function checkUpdate() {
         }
     } catch (error) {
         console.error("Failed to check for updates:", error);
+    }
+}
+
+// Load tuning settings on authorization
+async function loadTuningSettings() {
+    try {
+        const wdRes = await fetch('/api/watchdog');
+        if (wdRes.ok) {
+            const wdData = await wdRes.json();
+            if (wdData.success) {
+                document.getElementById('wdEnabled').value = wdData.wd_enabled;
+                document.getElementById('wdMinHashrate').value = wdData.wd_min_hashrate;
+            }
+        }
+        
+        const afRes = await fetch('/api/autofan');
+        if (afRes.ok) {
+            const afData = await afRes.json();
+            if (afData.success) {
+                document.getElementById('afEnabled').value = afData.enabled;
+                document.getElementById('afTargetCore').value = afData.target_temp;
+                document.getElementById('afTargetMem').value = afData.target_mem_temp;
+                document.getElementById('afMinFan').value = afData.min_fan;
+                document.getElementById('afMaxFan').value = afData.max_fan;
+                document.getElementById('afCriticalTemp').value = afData.critical_temp;
+            }
+        }
+        
+        loadPresetsList();
+    } catch (error) {
+        console.error("Failed to load tuning configs:", error);
+    }
+}
+
+// Load list of saved configuration presets
+async function loadPresetsList() {
+    const container = document.getElementById('presetsContainer');
+    try {
+        const response = await fetch('/api/presets');
+        const data = await response.json();
+        if (response.ok && data.success) {
+            if (data.presets.length === 0) {
+                container.innerHTML = `<div class="text-center text-muted small py-4">No profiles saved yet. Save active flight sheet as a preset.</div>`;
+                return;
+            }
+            
+            let html = '<div class="list-group list-group-flush border border-secondary-subtle rounded bg-dark-card">';
+            data.presets.forEach(name => {
+                html += `
+                    <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-2 px-3">
+                        <span class="fw-semibold text-white small">${name}</span>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-xs btn-success fw-semibold py-1 px-2 apply-preset-btn" data-preset="${name}">
+                                <i class="bi bi-play-circle-fill"></i> Swap
+                            </button>
+                            <button class="btn btn-xs btn-outline-danger py-1 px-2 delete-preset-btn" data-preset="${name}">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+            
+            document.querySelectorAll('.apply-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const name = this.getAttribute('data-preset');
+                    if (confirm(`Are you sure you want to load profile preset "${name}"? Active miner config files will be overwritten and miner restarted.`)) {
+                        applyPreset(name);
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.delete-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const name = this.getAttribute('data-preset');
+                    if (confirm(`Are you sure you want to delete profile preset "${name}"?`)) {
+                        deletePreset(name);
+                    }
+                });
+            });
+        } else {
+            container.innerHTML = `<div class="text-danger small py-3 text-center">Failed to load presets.</div>`;
+        }
+    } catch (error) {
+        container.innerHTML = `<div class="text-danger small py-3 text-center">Connection error.</div>`;
+    }
+}
+
+async function applyPreset(name) {
+    try {
+        const response = await fetch('/api/presets/apply', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ name: name })
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message, true);
+            fetchStats();
+        } else {
+            showToast(data.message || "Failed to apply profile preset.", false);
+        }
+    } catch (error) {
+        showToast("Network error applying preset.", false);
+    }
+}
+
+async function deletePreset(name) {
+    try {
+        const response = await fetch('/api/presets/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ name: name })
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(data.message, true);
+            loadPresetsList();
+        } else {
+            showToast(data.message || "Failed to delete preset.", false);
+        }
+    } catch (error) {
+        showToast("Network error deleting preset.", false);
     }
 }
