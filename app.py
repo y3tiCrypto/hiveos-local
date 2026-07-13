@@ -481,7 +481,7 @@ def get_overclocks_formatted():
 # Require authentication and CSRF token validations for all endpoints
 @app.before_request
 def require_auth():
-    if request.path == '/api/login' or request.path.startswith('/static/'):
+    if request.path in ['/', '/api/login'] or request.path.startswith('/static/'):
         return
     if not session.get('authenticated'):
         return jsonify({"success": False, "authenticated": False, "message": "Unauthorized"}), 401
