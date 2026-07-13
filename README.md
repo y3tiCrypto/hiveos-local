@@ -16,6 +16,7 @@ This application is hardened for live environments with the following layers:
 4. ⚙️ **Production WSGI Backend**: Runs on a multithreaded **Waitress WSGI** production server (handling up to 4 concurrent worker threads) instead of the single-threaded Flask development server.
 5. 🔄 **Fail-safe Rollback**: A backup copy of the overclock configurations (`nvidia-oc.conf.bak` and `amd-oc.conf.bak`) is created before any parameter updates are saved. Rigs can be instantly rolled back to their last-known stable configuration using the "Revert Settings" button.
 6. 📝 **Structured Server Logging**: Critical operations, updates, and authorization failures are written with timestamped severity tags directly to `/var/log/hiveos-local.log` (or local file in Demo Mode).
+7. 🌐 **Fleet Manager Integration**: A centralized, Dockerized manager is included under the `fleet-manager/` subdirectory to aggregate statistics, monitor temperatures, check speeds, and proxy commands across all your local mining rig nodes.
 
 ---
 
@@ -109,6 +110,24 @@ The dashboard offers advanced local command options inside the dashboard:
 - **Live console log streaming**: Click "View Miner Log" to launch a scrollable terminal streaming your active miner log outputs updated in real-time.
 - **Hashrate Watchdog & Autofan Tuning**: Configure low hashrate reboot conditions and GPU core/memory temperature fan ranges directly on the rig.
 - **Profile Presets (Flight Sheets)**: Save your current configurations as named presets and hot-swap between coins and wallets locally.
+
+---
+
+## Centralized Monitoring (Fleet Manager)
+
+The codebase includes **Fleet Manager**, a centralized monitoring server designed to run inside a Docker container.
+It allows you to:
+- Monitor multiple mining rigs from a single unified Bootstrap 5 dashboard.
+- View real-time speeds, temps, and active miner stats.
+- Proxy rig operations (like restarting miners or rebooting rigs) safely.
+
+To run the Fleet Manager:
+1. Ensure Docker is installed on your local monitoring machine.
+2. Navigate to `fleet-manager/` folder.
+3. Launch the container: `docker-compose up -d --build`.
+4. Open `http://localhost:8080` to access the Fleet Manager panel.
+
+For more details, see the [Fleet Manager README](file:///g:/LocalHiveOS/fleet-manager/README.md).
 
 ---
 

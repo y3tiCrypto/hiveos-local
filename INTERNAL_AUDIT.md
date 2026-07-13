@@ -84,6 +84,13 @@ The codebase was audited against common vulnerability vectors including shell co
   - Configuration updates run under the global `config_lock` to prevent concurrent write collisions.
 - **Audit Result**: **SECURE**.
 
+### 2.11. Centralized Command Proxy Sandboxing (CWE-441)
+- **Control Implemented**:
+  - Rig addition requests parse and validate incoming inputs (Name, IP, Port, PIN) using strict whitelists prior to executing test network connections.
+  - The API proxy route `/api/fleet/control` validates all incoming endpoint requests against a hardcoded array of whitelisted path targets: `["/api/miner/control", "/api/system/reboot", "/api/system/shutdown", "/api/overclock", "/api/revert", "/api/hugepages", "/api/autofan", "/api/watchdog"]`.
+  - Storing and modifying rigs data inside `data/rigs.json` is protected via a global thread lock `data_lock` preventing concurrent storage corruption.
+- **Audit Result**: **SECURE**.
+
 ---
 
 ## 3. Threat Modeling & Risk Matrix

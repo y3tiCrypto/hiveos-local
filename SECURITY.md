@@ -69,6 +69,11 @@ Because this software interfaces directly with hardware clocks and runs as `root
   - `/hive/sbin/sreboot` (graceful system reboots and shutdowns)
   - `/hive-config/` configuration files (presets storage, watchdog configs, autofan configs)
 
+### 3.4. Fleet Manager Isolation
+- **Credentials Persistence**: Stored PINs for all monitored rigs are stored in plaintext inside `data/rigs.json` in the Fleet Manager environment. This is required to proxy requests automatically without repeatedly prompting the user. Ensure the Fleet Manager host system and the mapped `./data` volume have restricted file read/write permissions (`chmod 700` or `600`).
+- **Container Security**: The Fleet Manager Docker container runs as a non-privileged user container mapping only the internal Flask web port. It does not have access to any host interfaces unless explicitly configured.
+- **Port Visibility**: Minimize exposure of rig local dashboard port `1337` and fleet manager port `8080`. Limit connections using firewall constraints (e.g. `ufw` or iptables) to allow access only from authorized monitoring stations.
+
 ---
 
 ## 4. Security Philosophy

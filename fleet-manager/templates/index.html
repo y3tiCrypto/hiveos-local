@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiveOS Fleet Manager</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom styling -->
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Header -->
+        <header class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4 pb-3 border-bottom border-secondary-subtle">
+            <div class="d-flex align-items-center gap-3">
+                <div class="logo-box">
+                    <i class="bi bi-grid-3x3-gap-fill text-primary fs-3"></i>
+                </div>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">HiveOS Fleet Manager</h1>
+                    <p class="text-muted small mb-0">Centralized Local Monitoring & Control Dashboard</p>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="refreshFleetBtn" class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh Fleet
+                </button>
+                <button class="btn btn-primary fw-semibold d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#addRigModal">
+                    <i class="bi bi-plus-circle-fill"></i> Add Rig
+                </button>
+            </div>
+        </header>
+
+        <!-- Fleet Overview Cards -->
+        <section class="row g-4 mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="card glass-card">
+                    <div class="card-body text-center p-3">
+                        <span class="text-muted small fw-semibold text-uppercase d-block mb-2">Fleet Status</span>
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-cpu-fill text-success fs-3"></i>
+                            <span id="fleetStatusText" class="fs-4 fw-bold">0 / 0</span>
+                        </div>
+                        <span class="small text-success-emphasis">Rigs Online</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card glass-card">
+                    <div class="card-body text-center p-3">
+                        <span class="text-muted small fw-semibold text-uppercase d-block mb-2">Total Speed</span>
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-lightning-charge-fill text-primary fs-3"></i>
+                            <span id="fleetHashrateText" class="fs-4 fw-bold font-monospace">0.00 MH/s</span>
+                        </div>
+                        <span class="small text-primary-emphasis">Combined Rate</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card glass-card">
+                    <div class="card-body text-center p-3">
+                        <span class="text-muted small fw-semibold text-uppercase d-block mb-2">Avg GPU Temp</span>
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-thermometer-half text-warning fs-3"></i>
+                            <span id="fleetTempText" class="fs-4 fw-bold font-monospace">0.0°C</span>
+                        </div>
+                        <span class="small text-warning-emphasis">Thermal Average</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="card glass-card">
+                    <div class="card-body text-center p-3">
+                        <span class="text-muted small fw-semibold text-uppercase d-block mb-2">Total Power</span>
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-plug-fill text-danger fs-3"></i>
+                            <span id="fleetPowerText" class="fs-4 fw-bold font-monospace">0 W</span>
+                        </div>
+                        <span class="small text-danger-emphasis">Combined Power Draw</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rig Cards Grid -->
+        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-pc-display text-secondary"></i> Monitored Fleet Rigs
+        </h2>
+        <section class="row g-4" id="fleetGridContainer">
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading fleet rigs...</span>
+                </div>
+                <p class="text-muted">Loading fleet data from registered local nodes...</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center text-muted small py-4 mt-5 border-top border-secondary-subtle">
+            <p class="mb-1">HiveOS Fleet Manager Dashboard (Running inside Docker container on port 8080)</p>
+            <p class="mb-0 text-warning-emphasis fw-semibold"><i class="bi bi-exclamation-triangle-fill"></i> Warning: This tool is currently in EXPERIMENTAL mode. Secure local segments and access boundaries are required.</p>
+        </footer>
+    </div>
+
+    <!-- Add Rig Modal -->
+    <div class="modal fade" id="addRigModal" tabindex="-1" aria-labelledby="addRigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-modal border border-secondary-subtle">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="addRigModalLabel">
+                        <i class="bi bi-plus-circle-fill text-primary me-2"></i> Register New Rig
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="addRigForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="rigName" class="form-label small fw-semibold text-muted mb-1">Rig Label / Name</label>
+                            <input type="text" class="form-control bg-dark-input text-white border-secondary-subtle" id="rigName" placeholder="e.g. Rig-01" required>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <label for="rigIp" class="form-label small fw-semibold text-muted mb-1">IP Address / Host</label>
+                                <input type="text" class="form-control bg-dark-input text-white border-secondary-subtle" id="rigIp" placeholder="e.g. 192.168.1.100" required>
+                            </div>
+                            <div class="col-4">
+                                <label for="rigPort" class="form-label small fw-semibold text-muted mb-1">Port</label>
+                                <input type="number" class="form-control bg-dark-input text-white border-secondary-subtle" id="rigPort" value="1337" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="rigPin" class="form-label small fw-semibold text-muted mb-1">Local Rig Access PIN</label>
+                            <input type="password" class="form-control bg-dark-input text-white border-secondary-subtle text-center fw-bold font-monospace" id="rigPin" maxlength="6" placeholder="Enter 6-digit PIN" required>
+                            <div class="form-text small text-muted">The access PIN configured on the rig during installation.</div>
+                        </div>
+                        <div id="addRigError" class="alert alert-danger small d-none mt-2">
+                            <i class="bi bi-x-circle-fill"></i> Failed to verify and add rig.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" id="addRigSubmitBtn" class="btn btn-primary fw-semibold">Verify & Register</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Miner Log Modal -->
+    <div class="modal fade" id="minerLogModal" tabindex="-1" aria-labelledby="minerLogModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content glass-modal border border-secondary-subtle">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="minerLogModalLabel">
+                        <i class="bi bi-terminal-fill text-primary me-2"></i> Rig Miner Log (<span id="activeRigLogName"></span>)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0 bg-black">
+                    <pre id="minerLogConsole" class="text-success p-3 font-monospace mb-0" style="font-size: 0.85rem; min-height: 400px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <span class="text-muted small me-auto"><i class="bi bi-arrow-repeat spin-animation"></i> Updates poll every 2s</span>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="statusToast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-center gap-2">
+                    <i id="toastIcon" class="bi"></i>
+                    <span id="toastMessage"></span>
+                </div>
+                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom Application Logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
