@@ -127,7 +127,7 @@ To run the Fleet Manager:
 3. Launch the container: `docker-compose up -d --build`.
 4. Open `http://localhost:8080` to access the Fleet Manager panel.
 
-For more details, see the [Fleet Manager README](file:///g:/LocalHiveOS/fleet-manager/README.md).
+For more details, see the [Fleet Manager README](./fleet-manager/README.md).
 
 ---
 
