@@ -69,7 +69,8 @@ def test_rig_connection(ip, port, pin):
             return False, "Authorization blocked: Too many failed login attempts on host."
         return False, f"Host returned server status code {login_res.status_code}."
     except requests.exceptions.RequestException as e:
-        return False, f"Connection timed out: {str(e)}"
+        logging.error(f"Connection test failed for {ip}:{port}: {e}")
+        return False, "Connection timed out or host unreachable."
 
 def fetch_single_rig_status(rig):
     """Worker task polling status of a single rig concurrently."""
@@ -268,7 +269,7 @@ def proxy_control_action():
         return jsonify({"success": False, "message": f"Authorization request returned status code {login_res.status_code}"}), 401
     except Exception as e:
         logging.error(f"Proxy request execution error: {e}")
-        return jsonify({"success": False, "message": f"Failed to contact target rig API: {str(e)}"}), 500
+        return jsonify({"success": False, "message": "Failed to contact target rig API. Verify connectivity."}), 500
 
 @app.route('/api/fleet/log/<rig_id>', methods=['GET'])
 def proxy_log_action(rig_id):
@@ -290,7 +291,8 @@ def proxy_log_action(rig_id):
             return jsonify({"success": False, "message": "Failed to query logs from target rig."}), log_res.status_code
         return jsonify({"success": False, "message": "Authorization rejected on target rig."}), 401
     except Exception as e:
-        return jsonify({"success": False, "message": f"Failed to reach target rig API: {str(e)}"}), 500
+        logging.error(f"Log retrieval proxy request failed: {e}")
+        return jsonify({"success": False, "message": "Failed to reach target rig API logs endpoint."}), 500
 
 @app.route('/')
 def dashboard():
