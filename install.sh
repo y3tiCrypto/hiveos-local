@@ -10,6 +10,24 @@ echo "[+] Starting HiveOS Local Dashboard Hardened Installation..."
 
 # Get current script directory
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+# Check for upgrade/update CLI parameter
+if [ "$1" == "--upgrade" ] || [ "$1" == "--update" ]; then
+  echo "[+] Upgrade flag detected. Pulling latest code from GitHub..."
+  if command -v git &> /dev/null; then
+    # Prevent directory ownership errors under root contexts
+    git config --global --add safe.directory "$DIR"
+    git fetch --all
+    git reset --hard origin/main
+    if [ $? -eq 0 ]; then
+      echo "[+] Successfully pulled latest release branch changes."
+    else
+      echo "[-] WARNING: Git update failed. Continuing installation using local files."
+    fi
+  else
+    echo "[-] WARNING: git command not found. Skipping online update."
+  fi
+fi
 echo "[+] Detected installation directory: $DIR"
 
 # 1. Install Dependencies (Flask + Waitress)
