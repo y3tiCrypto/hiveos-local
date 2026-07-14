@@ -1021,7 +1021,8 @@ def get_diagnostics():
         if res.returncode == 0 and res.stdout:
             gpu_logs = res.stdout
     except Exception as e:
-        gpu_logs = f"Failed to retrieve driver logs: {str(e)}"
+        logging.error(f"Failed to retrieve dmesg driver logs: {e}")
+        gpu_logs = "Failed to retrieve driver logs from system kernel."
         
     return jsonify({
         "success": True,

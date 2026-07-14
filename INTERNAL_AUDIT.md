@@ -91,6 +91,14 @@ The codebase was audited against common vulnerability vectors including shell co
   - Storing and modifying rigs data inside `data/rigs.json` is protected via a global thread lock `data_lock` preventing concurrent storage corruption.
 - **Audit Result**: **SECURE**.
 
+### 2.12. Safe Exception Containment in Local Diagnostics (CWE-209)
+- **Control Implemented**: The diagnostics `/api/diagnostics` and flight sheet `/api/flightsheet` endpoints write full raw system outputs and exception structures strictly to server console log streams, returning only generic user-safe error flags to the API clients, preventing stack trace disclosures.
+- **Audit Result**: **SECURE**.
+
+### 2.13. Safe Parameter Filtering for Local Flight Sheets (CWE-20)
+- **Control Implemented**: Coin, Wallet addresses, and Pool URLs are parsed and whitelisted using alphanumeric and secure schemes validations. Miner configurations are mapped directly to a whitelisted array: `["lolminer", "xmrig", "gminer", "rigel", "bzminer", "teamredminer", "hiveon", "srbminer", "wildrig-multi", "bminer", "ccminer", "t-rex", "none"]`.
+- **Audit Result**: **SECURE**.
+
 ---
 
 ## 3. Threat Modeling & Risk Matrix
