@@ -176,6 +176,9 @@
                                     <button id="viewMinerLogBtn" class="btn btn-sm btn-primary fw-semibold px-3 py-2 d-flex align-items-center gap-1">
                                         <i class="bi bi-terminal-fill"></i> View Miner Log
                                     </button>
+                                    <button id="openDiagBtn" class="btn btn-sm btn-outline-info fw-semibold px-3 py-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-activity"></i> Diagnostics
+                                    </button>
                                     <button id="rigRebootBtn" class="btn btn-sm btn-outline-warning fw-semibold px-3 py-2 d-flex align-items-center gap-1">
                                         <i class="bi bi-power"></i> Reboot Rig
                                     </button>
@@ -342,10 +345,57 @@
             </div>
             
             <div class="col-lg-6">
-                <div class="card glass-card h-100">
+                <!-- Emergency Flight Sheet Configurer -->
+                <div class="card glass-card mb-4">
+                    <div class="card-body">
+                        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+                            <i class="bi bi-wallet2 text-warning"></i> Emergency Flight Sheet Configurer
+                        </h2>
+                        <form id="emergencyFlightSheetForm">
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Active Coin</label>
+                                    <input type="text" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle" id="fsCoin" placeholder="e.g. BTC" required>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Active Miner</label>
+                                    <select class="form-select form-select-sm bg-dark-input text-white border-secondary-subtle" id="fsMiner" required>
+                                        <option value="lolminer">lolMiner</option>
+                                        <option value="xmrig">XMRig</option>
+                                        <option value="gminer">gMiner</option>
+                                        <option value="rigel">Rigel</option>
+                                        <option value="bzminer">bzMiner</option>
+                                        <option value="teamredminer">TeamRedMiner</option>
+                                        <option value="hiveon">HiveonMiner</option>
+                                        <option value="srbminer">SRBMiner</option>
+                                        <option value="wildrig-multi">WildRig-Multi</option>
+                                        <option value="bminer">bMiner</option>
+                                        <option value="ccminer">ccMiner</option>
+                                        <option value="t-rex">T-Rex</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Wallet Address / Template</label>
+                                    <input type="text" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle font-monospace" id="fsWallet" placeholder="Wallet address or pool template" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Mining Pool Server Connection</label>
+                                    <input type="text" class="form-control form-control-sm bg-dark-input text-white border-secondary-subtle font-monospace" id="fsPool" placeholder="stratum+tcp://pool-server:port" required>
+                                </div>
+                                <div class="col-12 text-end">
+                                    <button type="submit" class="btn btn-sm btn-warning px-4 py-2 fw-semibold">Apply Flight Sheet</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Local Profile Presets -->
+                <div class="card glass-card">
                     <div class="card-body d-flex flex-column">
                         <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
-                            <i class="bi bi-wallet2 text-primary"></i> Local Profile Presets (Flight Sheets)
+                            <i class="bi bi-folder-fill text-primary"></i> Local Profile Presets (Flight Sheets)
                         </h2>
                         <p class="text-muted small mb-3">
                             Save active coins and miner pool configurations as local presets to easily swap configuration setups.
@@ -575,6 +625,65 @@
                         <button type="submit" class="btn btn-success">Apply Settings</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnostics Modal -->
+    <div class="modal fade" id="diagModal" tabindex="-1" aria-labelledby="diagModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content glass-modal border border-secondary-subtle">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="diagModalLabel">
+                        <i class="bi bi-activity text-danger me-2"></i> Rig Network & Driver Diagnostics
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Network status row -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6 col-lg-3">
+                            <div class="bg-dark-card p-3 rounded border border-secondary-subtle text-center">
+                                <span class="small text-muted d-block mb-1">Local Gateway</span>
+                                <span id="diagGatewayIp" class="small fw-semibold font-monospace d-block mb-2">127.0.0.1</span>
+                                <span id="diagGatewayStatus" class="badge bg-secondary">Testing...</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="bg-dark-card p-3 rounded border border-secondary-subtle text-center">
+                                <span class="small text-muted d-block mb-1">WAN Internet</span>
+                                <span class="small fw-semibold font-monospace d-block mb-2">8.8.8.8</span>
+                                <span id="diagInternetStatus" class="badge bg-secondary">Testing...</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="bg-dark-card p-3 rounded border border-secondary-subtle text-center">
+                                <span class="small text-muted d-block mb-1">DNS Lookup</span>
+                                <span class="small fw-semibold font-monospace d-block mb-2">google.com</span>
+                                <span id="diagDnsStatus" class="badge bg-secondary">Testing...</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="bg-dark-card p-3 rounded border border-secondary-subtle text-center">
+                                <span class="small text-muted d-block mb-1">HiveOS Cloud</span>
+                                <span class="small fw-semibold font-monospace d-block mb-2">api.hiveon.com</span>
+                                <span id="diagHiveApiStatus" class="badge bg-secondary">Testing...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GPU logs console -->
+                    <h6 class="fw-bold mb-2 text-white-50"><i class="bi bi-terminal-fill me-1"></i> Kernel GPU Driver Messages (dmesg tail)</h6>
+                    <div class="bg-black rounded p-0 border border-secondary-subtle">
+                        <pre id="diagGpuLogs" class="text-success p-3 font-monospace mb-0" style="font-size: 0.8rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">Loading driver messages...</pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="runDiagBtn" class="btn btn-primary btn-sm fw-semibold d-flex align-items-center gap-1">
+                        <i class="bi bi-arrow-repeat"></i> Run Diagnostics
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
