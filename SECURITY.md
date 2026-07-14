@@ -28,6 +28,11 @@ The Y3TI Coding Team takes security seriously. If you find a vulnerability (e.g.
 
 Please do not open public issues on GitHub for potential security bugs until they have been reviewed and mitigated by the team.
 
+Please Note - your hardware is only as secure as your network and the end-user is responsible for maintaining good security practices. If your local network is compromised an actor can attempt to alter your configuration, mining settings, overclocks and more. 
+
+Any device able to reach port 8080 can make Fleet Manager use its stored PINs to reboot or shut down rigs, stop miners, alter overclocks, read logs, or delete fleet entries.
+Recommended: do not deploy Fleet Manager until it has authentication, authorization, CSRF protection, session security, and network allowlisting. As an immediate containment measure, bind it to 127.0.0.1 or a dedicated VPN address instead of all interfaces.
+
 ---
 
 ## 3. Secure Deployment Guidelines

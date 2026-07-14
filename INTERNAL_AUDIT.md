@@ -37,6 +37,7 @@ The codebase was audited against common vulnerability vectors including shell co
 
 ### 2.3. Authentication & Access Control (CWE-306)
 - **Vulnerability Context**: Operating on port `1337` on all LAN interfaces (`0.0.0.0`) exposes the dashboard to anyone on the same subnet. Without authentication, anyone on the local network could modify GPU clocks, increase voltages, or stop mining.
+Note that Fleet Manager listens on port 8080, Any device able to reach port 8080 can make Fleet Manager use its stored PINs to reboot or shut down rigs, stop miners, alter overclocks, read logs, or delete fleet entries.
 - **Control Implemented**: 
   - An auto-generated, randomized 6-digit access PIN is created during installation and stored in `/hive-config/dashboard.key`.
   - Flask session cookie protection manages authentication states.
