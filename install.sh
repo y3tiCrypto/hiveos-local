@@ -11,6 +11,46 @@ echo "[+] Starting HiveOS Local Dashboard Hardened Installation..."
 # Get current script directory
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Check for uninstall parameter
+if [ "$1" == "--uninstall" ]; then
+  echo "[+] Starting HiveOS Local Dashboard Uninstallation..."
+  
+  # 1. Stop and disable systemd service
+  if systemctl is-active --quiet hiveos-local.service; then
+    echo "[+] Stopping background service..."
+    systemctl stop hiveos-local.service
+  fi
+  if systemctl is-enabled --quiet hiveos-local.service &>/dev/null; then
+    echo "[+] Disabling background service..."
+    systemctl disable hiveos-local.service
+  fi
+  
+  # 2. Remove systemd service file
+  if [ -f "/etc/systemd/system/hiveos-local.service" ]; then
+    echo "[+] Removing systemd service unit file..."
+    rm -f "/etc/systemd/system/hiveos-local.service"
+    systemctl daemon-reload
+  fi
+
+  # 3. Clean credentials prompt
+  echo -n "[+] Clean uninstall: Do you want to remove authorization keys and presets? [y/N]: "
+  read -r clean_choice
+  if [[ "$clean_choice" =~ ^[Yy]$ ]]; then
+    echo "[+] Removing local credentials, presets, and backups..."
+    rm -f "/hive-config/dashboard.key"
+    rm -f "/hive-config/nvidia-oc.conf.bak"
+    rm -f "/hive-config/amd-oc.conf.bak"
+    rm -rf "/hive-config/presets"
+  else
+    echo "[+] Keeping authorization keys and configurations in place."
+  fi
+  
+  echo -e "\n=================================================================="
+  echo -e "\033[0;32m[+] HIVEOS LOCAL DASHBOARD UNINSTALLED SUCCESSFULLY!\033[0m"
+  echo -e "==================================================================\n"
+  exit 0
+fi
+
 # Check for upgrade/update CLI parameter
 if [ "$1" == "--upgrade" ] || [ "$1" == "--update" ]; then
   echo "[+] Upgrade flag detected. Pulling latest code from GitHub..."
