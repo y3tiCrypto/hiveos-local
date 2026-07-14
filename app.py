@@ -26,7 +26,7 @@ AUTOFAN_CONF = os.path.join(HIVE_CONFIG_DIR, "autofan.conf")
 PRESETS_DIR = os.path.join(HIVE_CONFIG_DIR, "presets")
 
 # Local Dashboard Release Version
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 # Verify environments
 IS_LINUX = platform.system() == "Linux"
