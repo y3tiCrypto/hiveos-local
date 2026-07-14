@@ -118,6 +118,10 @@ The dashboard offers advanced local command options inside the dashboard:
 - **Live console log streaming**: Click "View Miner Log" to launch a scrollable terminal streaming your active miner log outputs updated in real-time.
 - **Hashrate Watchdog & Autofan Tuning**: Configure low hashrate reboot conditions and GPU core/memory temperature fan ranges directly on the rig.
 - **Profile Presets (Flight Sheets)**: Save your current configurations as named presets and hot-swap between coins and wallets locally.
+- **Emergency Flight Sheet Configurer**: Directly edit and apply Coin, Wallet Address, Pool server connections, and selected Miner variables without SSH.
+- **Local Network & Hardware Diagnostics**: Check default gateway, DNS, WAN, and HiveOS cloud ping times, and parse tail outputs of kernel GPU driver error messages.
+- **Emergency Overclock Reset to Stock**: Instantly blank all GPU overclocks to safe factory stock limits with one click to recover from instability or freezes.
+- **Background Services Management**: Toggle active states of background services including the local watchdog daemon (`wd`), the autofan daemon (`autofan`), and the `hiveos-local` web server.
 
 ---
 
