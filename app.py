@@ -451,6 +451,74 @@ def get_gpu_stats():
                     except Exception as e:
                         logging.error(f"Error reading AMD sysfs indices: {e}")
 
+    if HAS_HIVEOS or IS_LINUX:
+        if os.path.exists("/sys/class/drm"):
+            cards = [d for d in os.listdir("/sys/class/drm") if re.match(r'^card\d+$', d)]
+            intel_idx = 0
+            for card in sorted(cards):
+                vendor_path = f"/sys/class/drm/{card}/device/vendor"
+                if os.path.exists(vendor_path):
+                    try:
+                        with open(vendor_path, 'r') as f:
+                            vendor = f.read().strip()
+                        if "0x8086" not in vendor:
+                            continue
+                    except Exception:
+                        continue
+                else:
+                    continue
+                    
+                hwmon_path = f"/sys/class/drm/{card}/device/hwmon"
+                temp = 0
+                fan = 0
+                power = 0.0
+                model = "Intel Arc GPU"
+                
+                if os.path.exists(hwmon_path):
+                    try:
+                        hwmons = os.listdir(hwmon_path)
+                        if hwmons:
+                            hpath = f"{hwmon_path}/{hwmons[0]}"
+                            if os.path.exists(f"{hpath}/temp1_input"):
+                                with open(f"{hpath}/temp1_input", 'r') as f:
+                                    temp = int(int(f.read().strip()) / 1000)
+                            
+                            if os.path.exists(f"{hpath}/fan1_input"):
+                                with open(f"{hpath}/fan1_input", 'r') as f:
+                                    rpm = int(f.read().strip())
+                                    fan = min(100, int(rpm / 30))
+                                    
+                            if os.path.exists(f"{hpath}/power1_average"):
+                                with open(f"{hpath}/power1_average", 'r') as f:
+                                    power = round(float(f.read().strip()) / 1000000.0, 1)
+                    except Exception as e:
+                        logging.debug(f"Failed to read Intel sysfs hwmon stats: {e}")
+                            
+                device_path = f"/sys/class/drm/{card}/device/device"
+                if os.path.exists(device_path):
+                    try:
+                        with open(device_path, 'r') as f:
+                            dev_id = f.read().strip()
+                        model = f"Intel Arc GPU ({dev_id})"
+                    except Exception:
+                        pass
+                        
+                gpus.append({
+                    "id": f"INTEL_{intel_idx}",
+                    "index": intel_idx,
+                    "brand": "INTEL",
+                    "model": model,
+                    "temp": temp,
+                    "fan": fan,
+                    "power": power,
+                    "power_limit": 0.0,
+                    "utilization": 0,
+                    "core_clock": 0,
+                    "mem_clock": 0,
+                    "hashrate": 0.0
+                })
+                intel_idx += 1
+
     return gpus
 
 # Read configs formatted

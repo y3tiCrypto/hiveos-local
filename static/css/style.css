@@ -160,6 +160,11 @@ body {
     font-weight: 700;
 }
 
+.brand-intel {
+    color: #00c4ff;
+    font-weight: 700;
+}
+
 /* Metric Bars */
 .metric-row {
     margin-bottom: 10px;
