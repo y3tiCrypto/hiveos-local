@@ -26,7 +26,7 @@ AUTOFAN_CONF = os.path.join(HIVE_CONFIG_DIR, "autofan.conf")
 PRESETS_DIR = os.path.join(HIVE_CONFIG_DIR, "presets")
 
 # Local Dashboard Release Version
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 # Verify environments
 IS_LINUX = platform.system() == "Linux"
@@ -975,6 +975,132 @@ def delete_preset():
     except Exception as e:
         logging.error(f"Failed to delete preset '{name}': {e}")
         return jsonify({"success": False, "message": "Failed to remove preset files."}), 500
+
+def ping_host(host, count=1, timeout=2):
+    """Utility helper pinging a destination IP/Host under Linux environment."""
+    cmd = f"ping -c {count} -W {timeout} {host}"
+    try:
+        res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+def get_local_gateway():
+    """Detects default routing gateway IP using route commands."""
+    try:
+        res = subprocess.run("ip route show | grep default", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout:
+            parts = res.stdout.split()
+            if len(parts) >= 3:
+                return parts[2]
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+@app.route('/api/diagnostics', methods=['GET'])
+def get_diagnostics():
+    gateway = get_local_gateway()
+    
+    # Run diagnostics pings
+    gateway_ok = ping_host(gateway)
+    internet_ok = ping_host("8.8.8.8")
+    hive_api_ok = ping_host("api.hiveon.com")
+    
+    # DNS check
+    dns_ok = False
+    try:
+        socket.gethostbyname("google.com")
+        dns_ok = True
+    except Exception:
+        pass
+        
+    # GPU kernel driver logs check
+    gpu_logs = "No driver logs detected."
+    try:
+        res = subprocess.run("dmesg | grep -iE 'nouveau|nvidia|amdgpu|pci|thermal|power' | tail -n 25", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout:
+            gpu_logs = res.stdout
+    except Exception as e:
+        logging.error(f"Failed to retrieve dmesg driver logs: {e}")
+        gpu_logs = "Failed to retrieve driver logs from system kernel."
+        
+    return jsonify({
+        "success": True,
+        "gateway_ip": gateway,
+        "gateway_ping": "Online" if gateway_ok else "Offline",
+        "internet_wan": "Online" if internet_ok else "Offline",
+        "dns_resolution": "Working" if dns_ok else "Failed",
+        "hiveos_api": "Reachable" if hive_api_ok else "Unreachable",
+        "gpu_logs": gpu_logs
+    })
+
+@app.route('/api/flightsheet', methods=['GET', 'POST'])
+def handle_flightsheet():
+    if request.method == 'GET':
+        wallet_conf = parse_shell_config(WALLET_CONF_PATH)
+        rig_conf = parse_shell_config(RIG_CONF_PATH)
+        return jsonify({
+            "success": True,
+            "coin": wallet_conf.get("COIN", ""),
+            "wallet": wallet_conf.get("WAL", ""),
+            "pool": wallet_conf.get("POOL_URL", ""),
+            "miner": rig_conf.get("MINER", "none")
+        })
+        
+    # POST - Save Flight Sheet
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Invalid JSON payload"}), 400
+        
+    coin = str(data.get("coin", "")).strip()
+    wallet = str(data.get("wallet", "")).strip()
+    pool = str(data.get("pool", "")).strip()
+    miner = str(data.get("miner", "none")).strip().lower()
+    
+    # Parameter inputs validation
+    if not re.match(r'^[A-Za-z0-9_\-\s]+$', coin):
+        return jsonify({"success": False, "message": "Invalid Coin parameter. Use alphanumeric characters only."}), 400
+    if not re.match(r'^[A-Za-z0-9_\-\s\.\/\@]+$', wallet):
+        return jsonify({"success": False, "message": "Invalid Wallet format."}), 400
+    if not re.match(r'^[a-zA-Z0-9\.\-\:\/]+$', pool):
+        return jsonify({"success": False, "message": "Invalid Pool URL format."}), 400
+        
+    whitelisted_miners = [
+        "lolminer", "xmrig", "gminer", "rigel", "bzminer", 
+        "teamredminer", "hiveon", "srbminer", "wildrig-multi",
+        "bminer", "ccminer", "t-rex", "none"
+    ]
+    if miner not in whitelisted_miners:
+        return jsonify({"success": False, "message": "Unsupported miner program choice."}), 400
+
+    # Backup files first
+    try:
+        if os.path.exists(WALLET_CONF_PATH):
+            shutil.copy2(WALLET_CONF_PATH, WALLET_CONF_PATH + ".bak")
+        if os.path.exists(RIG_CONF_PATH):
+            shutil.copy2(RIG_CONF_PATH, RIG_CONF_PATH + ".bak")
+    except Exception as e:
+        logging.error(f"Backup configurations failed: {e}")
+        
+    # Update configurations
+    wallet_conf = parse_shell_config(WALLET_CONF_PATH)
+    wallet_conf["COIN"] = coin
+    wallet_conf["WAL"] = wallet
+    wallet_conf["POOL_URL"] = pool
+    # Write back
+    if not write_shell_config(WALLET_CONF_PATH, wallet_conf):
+        return jsonify({"success": False, "message": "Failed to write wallet.conf"}), 500
+        
+    rig_conf = parse_shell_config(RIG_CONF_PATH)
+    rig_conf["MINER"] = miner
+    if not write_shell_config(RIG_CONF_PATH, rig_conf):
+        return jsonify({"success": False, "message": "Failed to write rig.conf"}), 500
+        
+    logging.info(f"Emergency Local Flight Sheet updated by IP: {request.remote_addr} (Coin={coin}, Miner={miner})")
+    
+    # Restart miner to apply settings on the fly
+    run_command("sudo /hive/bin/miner stop && sudo /hive/bin/miner start")
+    return jsonify({"success": True, "message": "Flight sheet saved successfully! Miner daemon restarting..."})
 
 @app.route('/api/update/check', methods=['GET'])
 def check_update():

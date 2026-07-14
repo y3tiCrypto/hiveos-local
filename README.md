@@ -40,6 +40,10 @@ sudo ./install.sh
 # 5. Upgrading / Updating
 # If you need to pull the latest updates from GitHub and reinstall:
 sudo ./install.sh --upgrade
+
+# 6. Uninstallation
+# If you want to stop, disable, and clean up the dashboard service:
+sudo ./install.sh --uninstall
 ```
 
 During installation, the script will read dependencies from [requirements.txt](file:///g:/LocalHiveOS/requirements.txt) to check and install the Flask and Waitress packages, register a systemd daemon (`hiveos-local.service`), and start the server on port `1337`.

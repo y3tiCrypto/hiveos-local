@@ -292,6 +292,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Emergency Flight Sheet Configurer form submit
+    document.getElementById('emergencyFlightSheetForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const origHTML = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+
+        const coin = document.getElementById('fsCoin').value.trim();
+        const wallet = document.getElementById('fsWallet').value.trim();
+        const pool = document.getElementById('fsPool').value.trim();
+        const miner = document.getElementById('fsMiner').value;
+
+        try {
+            const response = await fetch('/api/flightsheet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ coin, wallet, pool, miner })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast(data.message, true);
+                fetchStats();
+            } else {
+                showToast(data.message || "Failed to apply flight sheet.", false);
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("Network error trying to apply configuration.", false);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHTML;
+        }
+    });
+
+    // Diagnostics modal bindings
+    const diagModalEl = document.getElementById('diagModal');
+    const diagModal = new bootstrap.Modal(diagModalEl);
+    
+    document.getElementById('openDiagBtn').addEventListener('click', () => {
+        diagModal.show();
+    });
+    
+    document.getElementById('runDiagBtn').addEventListener('click', runDiagnostics);
+    diagModalEl.addEventListener('shown.bs.modal', runDiagnostics);
+    
     async function sendSystemPowerAction(endpoint, btnId) {
         const btn = document.getElementById(btnId);
         const originalHtml = btn.innerHTML;
@@ -816,6 +865,8 @@ async function loadTuningSettings() {
             }
         }
         
+        
+        loadFlightSheetSettings();
         loadPresetsList();
     } catch (error) {
         console.error("Failed to load tuning configs:", error);
@@ -918,5 +969,69 @@ async function deletePreset(name) {
         }
     } catch (error) {
         showToast("Network error deleting preset.", false);
+    }
+}
+
+async function loadFlightSheetSettings() {
+    try {
+        const res = await fetch('/api/flightsheet');
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.success) {
+                document.getElementById('fsCoin').value = data.coin;
+                document.getElementById('fsWallet').value = data.wallet;
+                document.getElementById('fsPool').value = data.pool;
+                document.getElementById('fsMiner').value = data.miner;
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load flight sheet settings:", e);
+    }
+}
+
+async function runDiagnostics() {
+    const runBtn = document.getElementById('runDiagBtn');
+    const origHTML = runBtn.innerHTML;
+    runBtn.disabled = true;
+    runBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...`;
+
+    document.getElementById('diagGatewayStatus').className = 'badge bg-secondary';
+    document.getElementById('diagGatewayStatus').textContent = 'Testing...';
+    document.getElementById('diagInternetStatus').className = 'badge bg-secondary';
+    document.getElementById('diagInternetStatus').textContent = 'Testing...';
+    document.getElementById('diagDnsStatus').className = 'badge bg-secondary';
+    document.getElementById('diagDnsStatus').textContent = 'Testing...';
+    document.getElementById('diagHiveApiStatus').className = 'badge bg-secondary';
+    document.getElementById('diagHiveApiStatus').textContent = 'Testing...';
+    document.getElementById('diagGpuLogs').textContent = 'Running system tests...';
+
+    try {
+        const res = await fetch('/api/diagnostics');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('diagGatewayIp').textContent = data.gateway_ip;
+                
+                const setBadge = (id, status) => {
+                    const el = document.getElementById(id);
+                    el.textContent = status;
+                    el.className = `badge ${status === 'Online' || status === 'Working' || status === 'Reachable' ? 'bg-success' : 'bg-danger'}`;
+                };
+                
+                setBadge('diagGatewayStatus', data.gateway_ping);
+                setBadge('diagInternetStatus', data.internet_wan);
+                setBadge('diagDnsStatus', data.dns_resolution);
+                setBadge('diagHiveApiStatus', data.hiveos_api);
+                document.getElementById('diagGpuLogs').textContent = data.gpu_logs;
+            }
+        } else {
+            document.getElementById('diagGpuLogs').textContent = 'Diagnostics API request failed.';
+        }
+    } catch (e) {
+        console.error(e);
+        document.getElementById('diagGpuLogs').textContent = 'Connection timeout checking diagnostics.';
+    } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = origHTML;
     }
 }
