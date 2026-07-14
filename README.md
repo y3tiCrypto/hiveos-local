@@ -1,5 +1,8 @@
 # HiveOS Local GPU Manager (HiveOS-Local)
 
+[![GitHub downloads](https://img.shields.io/github/downloads/y3tiCrypto/hiveos-local/total.svg?style=flat-square&color=blue&logo=github)](https://github.com/y3tiCrypto/hiveos-local/releases)
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fy3tiCrypto%2Fhiveos-local&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=clones%2Fviews&edge_flat=true)](https://github.com/y3tiCrypto/hiveos-local)
+
 A lightweight, local, browser-based emergency diagnostics and GPU overclocking manager designed to run side-by-side on rigs powered by **HiveOS** (https://hiveon.com).
 
 When Hiveon's remote API or central cloud servers experience outages, communication between your mining rig and the main HiveOS dashboard breaks, rendering remote management impossible. **HiveOS-Local** bypasses the cloud entirely, hosting a production-grade, secure, and user-friendly control interface directly from the mining rig's local IP address on port **`1337`**.
