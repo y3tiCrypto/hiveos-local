@@ -20,7 +20,7 @@ Only the latest release version on the `main` branch is actively supported and r
 The Y3TI Coding Team takes security seriously. If you find a vulnerability (e.g. bypass authentication, arbitrary execution, file access limits), please report it directly using the instructions below.
 
 ### 2.1. Vulnerability Reporting Channels
-- **Reporting Contact**: Please open a confidential GitHub Security Advisory, or email the team at `security@y3ticoding.team` (if active).
+- **Reporting Contact**: Please open a confidential GitHub Security Advisory.
 - **Required Details**:
   - A description of the issue and the potential impact.
   - Step-by-step reproduction instructions (PoC script, query payload, or settings input).
