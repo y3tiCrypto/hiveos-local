@@ -41,6 +41,9 @@
                 <button id="revertSettingsBtn" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-2 px-3 border border-danger-subtle d-none">
                     <i class="bi bi-arrow-counterclockwise"></i> Revert Settings
                 </button>
+                <button id="emergencyResetClocksBtn" class="btn btn-sm btn-danger d-flex align-items-center gap-1 py-2 px-3 d-none">
+                    <i class="bi bi-exclamation-octagon-fill"></i> Reset Clocks to Stock
+                </button>
                 <span class="badge bg-success-glow d-flex align-items-center gap-1 py-2 px-3 border border-success">
                     <span class="pulse-indicator"></span> Live Monitoring Active
                 </span>
@@ -338,6 +341,61 @@
                                 <button id="manualCheckUpdateBtn" class="btn btn-sm btn-outline-info fw-semibold d-flex align-items-center gap-1">
                                     <i class="bi bi-arrow-repeat"></i> Check for Updates
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Rig Services Control Panel -->
+                        <div class="mt-4 border-top border-secondary-subtle pt-3">
+                            <h3 class="h6 fw-bold mb-3 text-secondary-emphasis">
+                                <i class="bi bi-cpu-fill text-warning"></i> Background Services Management
+                            </h3>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-dark table-borderless align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead>
+                                        <tr class="text-muted border-bottom border-secondary-subtle">
+                                            <th>Service Daemon</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <span class="fw-semibold text-white">Watchdog daemon (wd)</span>
+                                                <span class="d-block small text-muted">Controls hashrate thresholds</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-success service-ctrl-btn" data-service="wd" data-action="restart" title="Restart / Start service"><i class="bi bi-play-fill"></i></button>
+                                                    <button class="btn btn-outline-danger service-ctrl-btn" data-service="wd" data-action="stop" title="Stop service"><i class="bi bi-stop-fill"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <span class="fw-semibold text-white">Autofan daemon (autofan)</span>
+                                                <span class="d-block small text-muted">Regulates fans duty cycles</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-success service-ctrl-btn" data-service="autofan" data-action="restart" title="Restart / Start service"><i class="bi bi-play-fill"></i></button>
+                                                    <button class="btn btn-outline-danger service-ctrl-btn" data-service="autofan" data-action="stop" title="Stop service"><i class="bi bi-stop-fill"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <span class="fw-semibold text-white">Local Dashboard Service</span>
+                                                <span class="d-block small text-muted">Logger daemon and web server</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-warning service-ctrl-btn" data-service="hiveos-local" data-action="restart" title="Restart local service"><i class="bi bi-arrow-clockwise"></i></button>
+                                                    <button class="btn btn-outline-danger service-ctrl-btn" data-service="hiveos-local" data-action="stop" title="Stop local service"><i class="bi bi-stop-fill"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

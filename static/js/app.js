@@ -292,6 +292,83 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Emergency Overclock Reset trigger
+    document.getElementById('emergencyResetClocksBtn').addEventListener('click', async () => {
+        if (!confirm("WARNING: This will instantly clear all GPU overclock values (clocks, fans, voltages, power limits) to factory stock configurations. Stabilize rig now?")) {
+            return;
+        }
+        
+        const btn = document.getElementById('emergencyResetClocksBtn');
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Resetting...`;
+        
+        try {
+            const res = await fetch('/api/overclock/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast(data.message, true);
+                fetchStats();
+            } else {
+                showToast(data.message || "Failed to reset clocks.", false);
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Network error trying to reset clocks.", false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+        }
+    });
+
+    // Background Services control triggers
+    document.querySelectorAll('.service-ctrl-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const service = this.dataset.service;
+            const action = this.dataset.action;
+            
+            if (!confirm(`Are you sure you want to ${action} the '${service}' service daemon?`)) {
+                return;
+            }
+            
+            this.disabled = true;
+            const origHTML = this.innerHTML;
+            this.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
+            
+            try {
+                const res = await fetch('/api/services/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({ service, action })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(data.message, true);
+                    if (service === 'hiveos-local') {
+                        setTimeout(() => { window.location.reload(); }, 3500);
+                    }
+                } else {
+                    showToast(data.message || "Failed to control service.", false);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast("Network error communicating with service manager.", false);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = origHTML;
+            }
+        });
+    });
+    
     // Emergency Flight Sheet Configurer form submit
     document.getElementById('emergencyFlightSheetForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -540,6 +617,7 @@ async function fetchStats() {
         if (response.status === 401) {
             document.getElementById('loginOverlay').classList.remove('d-none');
             document.getElementById('revertSettingsBtn').classList.add('d-none');
+            document.getElementById('emergencyResetClocksBtn').classList.add('d-none');
             return;
         }
         
@@ -551,6 +629,7 @@ async function fetchStats() {
         if (!document.getElementById('loginOverlay').classList.contains('d-none')) {
             document.getElementById('loginOverlay').classList.add('d-none');
             document.getElementById('revertSettingsBtn').classList.remove('d-none');
+            document.getElementById('emergencyResetClocksBtn').classList.remove('d-none');
             loadTuningSettings();
         }
         

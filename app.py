@@ -1102,6 +1102,85 @@ def handle_flightsheet():
     run_command("sudo /hive/bin/miner stop && sudo /hive/bin/miner start")
     return jsonify({"success": True, "message": "Flight sheet saved successfully! Miner daemon restarting..."})
 
+@app.route('/api/overclock/reset', methods=['POST'])
+def reset_overclock():
+    # Create backups first
+    backup_configs()
+    
+    nv_stock = {
+        "CORE": "",
+        "MEM": "",
+        "PL": "",
+        "FAN": ""
+    }
+    amd_stock = {
+        "CORE": "",
+        "MEM": "",
+        "VDD": "",
+        "VDDCI": "",
+        "MVDD": "",
+        "FAN": "",
+        "PL": "",
+        "DPM": "",
+        "REF": ""
+    }
+    
+    if write_shell_config(NVIDIA_OC_CONF, nv_stock) and write_shell_config(AMD_OC_CONF, amd_stock):
+        logging.info(f"Emergency overclock reset to stock by request from {request.remote_addr}")
+        # Apply clean stock settings immediately on hardware
+        run_command("sudo /hive/sbin/nvidia-oc")
+        run_command("sudo /hive/sbin/amd-oc")
+        return jsonify({"success": True, "message": "Emergency reset completed! All overclock profiles reset to safe factory stock limits."})
+    else:
+        return jsonify({"success": False, "message": "Failed to overwrite overclock configuration files."}), 500
+
+@app.route('/api/services/control', methods=['POST'])
+def service_control():
+    data = request.get_json()
+    if not data or 'service' not in data or 'action' not in data:
+        return jsonify({"success": False, "message": "Missing service or action parameter."}), 400
+        
+    service = str(data['service']).strip().lower()
+    action = str(data['action']).strip().lower()
+    
+    if service not in ["wd", "autofan", "hiveos-local"]:
+        return jsonify({"success": False, "message": "Invalid service target."}), 400
+    if action not in ["start", "stop", "restart"]:
+        return jsonify({"success": False, "message": "Invalid action choice."}), 400
+        
+    logging.info(f"Service control: '{action}' on '{service}' by IP: {request.remote_addr}")
+    
+    code = 0
+    stderr = ""
+    
+    if service == "wd":
+        if action in ["start", "restart"]:
+            stdout, stderr, code = run_command("sudo /hive/bin/wd restart")
+        else:
+            stdout, stderr, code = run_command("sudo /hive/bin/wd stop")
+    elif service == "autofan":
+        if action in ["start", "restart"]:
+            stdout, stderr, code = run_command("sudo /hive/bin/autofan restart")
+        else:
+            stdout, stderr, code = run_command("sudo /hive/bin/autofan stop")
+    elif service == "hiveos-local":
+        if action == "restart":
+            cmd = 'nohup bash -c "sleep 1.5 && sudo systemctl restart hiveos-local.service" > /dev/null 2>&1 &'
+            subprocess.Popen(cmd, shell=True)
+            return jsonify({"success": True, "message": "Logger service restart scheduled."})
+        elif action == "stop":
+            cmd = 'nohup bash -c "sleep 1.5 && sudo systemctl stop hiveos-local.service" > /dev/null 2>&1 &'
+            subprocess.Popen(cmd, shell=True)
+            return jsonify({"success": True, "message": "Logger service shutdown scheduled."})
+        elif action == "start":
+            stdout, stderr, code = run_command("sudo systemctl start hiveos-local.service")
+            
+    if code == 0:
+        return jsonify({"success": True, "message": f"Service '{service}' successfully {action}ed!"})
+    else:
+        logging.error(f"Service control execution failed on {service}: {stderr}")
+        return jsonify({"success": False, "message": "Service command execution failed. Check system logs."}), 500
+
 @app.route('/api/update/check', methods=['GET'])
 def check_update():
     try:
