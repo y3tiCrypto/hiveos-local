@@ -1,11 +1,13 @@
 import os
 import re
+import time
 import json
 import uuid
 import logging
+import secrets
 import threading
 import requests
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session
 from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
@@ -14,8 +16,17 @@ app = Flask(__name__)
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 RIGS_JSON_PATH = os.path.join(DATA_DIR, "rigs.json")
 
-# Ensure persistence folder exists
+# Ensure persistence folder exists with safe permissions
 os.makedirs(DATA_DIR, exist_ok=True)
+try:
+    os.chmod(DATA_DIR, 0o700)
+except Exception:
+    pass
+
+# Initialize session security configuration
+app.secret_key = secrets.token_hex(32)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Threading lock for storage operations
 data_lock = threading.Lock()
@@ -25,6 +36,56 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] (%(threadName)s) %(message)s'
 )
+
+def get_or_create_fleet_pin():
+    """Generates an 8-character cryptographic random PIN if not present."""
+    pin_file = os.path.join(DATA_DIR, "fleet_pin.txt")
+    if os.path.exists(pin_file):
+        try:
+            with open(pin_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+            
+    # Generate 8-character random PIN cryptographically
+    pin = "".join([str(secrets.randbelow(10)) for _ in range(8)])
+    try:
+        with open(pin_file, "w") as f:
+            f.write(pin)
+        try:
+            os.chmod(pin_file, 0o600)
+        except Exception:
+            pass
+            
+        logging.info("==================================================")
+        logging.info(f"  FLEET MANAGER ACCESS PIN CREATED: {pin}")
+        logging.info("  YOU CAN ALWAYS FIND IT IN YOUR DATA DIRECTORY.")
+        logging.info("==================================================")
+    except Exception as e:
+        logging.error(f"Failed to save Fleet Access PIN: {e}")
+    return pin
+
+app.config['ACCESS_PIN'] = get_or_create_fleet_pin()
+
+# Rate-limiting failed logins storage
+failed_login_attempts = {}
+
+@app.before_request
+def require_auth():
+    # Allow login page, static assets, and login endpoint without auth
+    if request.path in ['/', '/api/login'] or request.path.startswith('/static/'):
+        return
+        
+    if not session.get('authenticated'):
+        return jsonify({"success": False, "authenticated": False, "message": "Unauthorized"}), 401
+        
+    # Enforce Anti-CSRF on modifying requests (POST, DELETE)
+    if request.method in ['POST', 'DELETE']:
+        token = request.headers.get('X-CSRF-Token')
+        expected = session.get('csrf_token')
+        if not token or not expected or token != expected:
+            logging.warning(f"CSRF Alert: Invalid or missing token from IP {request.remote_addr}")
+            return jsonify({"success": False, "message": "CSRF verification failed."}), 403
 
 def load_rigs():
     """Reads rigs list from rigs.json with threading lock protection."""
@@ -39,11 +100,17 @@ def load_rigs():
             return []
 
 def save_rigs(rigs):
-    """Writes rigs list to rigs.json with threading lock protection."""
+    """Writes rigs list to rigs.json with threading lock protection and owner-only permissions."""
     with data_lock:
         try:
+            file_exists = os.path.exists(RIGS_JSON_PATH)
             with open(RIGS_JSON_PATH, 'w') as f:
                 json.dump(rigs, f, indent=4)
+            if not file_exists:
+                try:
+                    os.chmod(RIGS_JSON_PATH, 0o600)
+                except Exception:
+                    pass
             return True
         except Exception as e:
             logging.error(f"Failed to write rigs storage: {e}")
@@ -54,12 +121,10 @@ def test_rig_connection(ip, port, pin):
     url = f"http://{ip}:{port}"
     try:
         session = requests.Session()
-        # Authenticate via PIN login
         login_res = session.post(f"{url}/api/login", json={"pin": pin}, timeout=4)
         if login_res.status_code == 200:
             data = login_res.json()
             if data.get("success"):
-                # Fetch stats to verify session state is valid
                 stats_res = session.get(f"{url}/api/stats", timeout=4)
                 if stats_res.status_code == 200:
                     return True, stats_res.json()
@@ -107,13 +172,57 @@ def fetch_single_rig_status(rig):
             "error": "Rig unreachable or offline."
         }
 
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    ip = request.remote_addr
+    now = time.time()
+    
+    if ip in failed_login_attempts:
+        record = failed_login_attempts[ip]
+        if record["blocked_until"] > now:
+            remaining = int(record["blocked_until"] - now)
+            logging.warning(f"Blocked login attempt from locked-out IP {ip}. Remaining: {remaining}s")
+            return jsonify({"success": False, "message": f"Too many failed attempts. Try again in {remaining} seconds."}), 429
+            
+    data = request.get_json()
+    if not data or 'pin' not in data:
+        return jsonify({"success": False, "message": "Missing PIN"}), 400
+        
+    user_pin = str(data['pin']).strip()
+    if user_pin == app.config['ACCESS_PIN']:
+        if ip in failed_login_attempts:
+            del failed_login_attempts[ip]
+            
+        session['authenticated'] = True
+        csrf_token = secrets.token_hex(16)
+        session['csrf_token'] = csrf_token
+        
+        logging.info(f"Authorized Fleet Manager login request from IP: {ip}")
+        return jsonify({"success": True, "message": "Authenticated successfully!", "csrf_token": csrf_token})
+        
+    if ip not in failed_login_attempts:
+        failed_login_attempts[ip] = {"count": 1, "blocked_until": 0.0}
+    else:
+        failed_login_attempts[ip]["count"] += 1
+        
+    record = failed_login_attempts[ip]
+    if record["count"] >= 5:
+        record["blocked_until"] = now + 900
+        logging.warning(f"IP {ip} locked out of Fleet Manager for 15 minutes after 5 failures.")
+        return jsonify({"success": False, "message": "Too many failed attempts. Access blocked for 15 minutes."}), 429
+        
+    return jsonify({"success": False, "message": "Invalid Access PIN. Try again."}), 401
+
 @app.route('/api/rigs', methods=['GET', 'POST'])
 def manage_rigs():
     if request.method == 'GET':
         rigs = load_rigs()
-        # Omit PIN codes from basic listings for security
         safe_list = [{k: v for k, v in r.items() if k != 'pin'} for r in rigs]
-        return jsonify({"success": True, "rigs": safe_list})
+        return jsonify({
+            "success": True,
+            "csrf_token": session.get('csrf_token'),
+            "rigs": safe_list
+        })
 
     # POST - Add Rig
     data = request.get_json()
@@ -125,7 +234,6 @@ def manage_rigs():
     port = int(data.get('port', 1337))
     pin = str(data['pin']).strip()
 
-    # Validations
     if not re.match(r'^[A-Za-z0-9_\-\s]+$', name):
         return jsonify({"success": False, "message": "Invalid rig name. Use alphanumeric characters only."}), 400
     if not re.match(r'^[a-zA-Z0-9\.\-\:]+$', ip):
@@ -135,13 +243,11 @@ def manage_rigs():
     if not (len(pin) == 6 and pin.isdigit()):
         return jsonify({"success": False, "message": "Access PIN must be a 6-digit number."}), 400
 
-    # Test connectivity first
     connected, test_stats = test_rig_connection(ip, port, pin)
     if not connected:
         return jsonify({"success": False, "message": f"Rig connection test failed: {test_stats}"}), 400
 
     rigs = load_rigs()
-    # Prevent duplicate IP:Port additions
     if any(r['ip'] == ip and r['port'] == port for r in rigs):
         return jsonify({"success": False, "message": "A rig with this IP address and Port is already configured."}), 409
 
@@ -188,11 +294,9 @@ def get_fleet_stats():
             "rigs": []
         })
 
-    # Poll status concurrently using a thread pool
     with ThreadPoolExecutor(max_workers=min(16, len(rigs))) as executor:
         results = list(executor.map(fetch_single_rig_status, rigs))
 
-    # Compile summary parameters
     online_count = 0
     total_hashrate = 0.0
     total_power = 0.0
@@ -209,7 +313,6 @@ def get_fleet_stats():
                 total_power += g.get("power", 0.0)
                 temp_sum += g.get("temp", 0)
                 gpu_count += 1
-            # Include CPU mining speed (Convert H/s to MH/s)
             cpu_hash = stats.get("system", {}).get("cpu", {}).get("hashrate", 0.0)
             total_hashrate += cpu_hash / 1000000.0
 
@@ -237,7 +340,6 @@ def proxy_control_action():
     endpoint = str(data['endpoint']).strip()
     payload = data.get('payload', {})
 
-    # Safety validation: lock targets to standard write paths only to prevent breakout attacks
     if endpoint not in ["/api/miner/control", "/api/system/reboot", "/api/system/shutdown", "/api/overclock", "/api/revert", "/api/hugepages", "/api/autofan", "/api/watchdog"]:
         return jsonify({"success": False, "message": "Target endpoint operation is restricted."}), 403
 
@@ -249,14 +351,11 @@ def proxy_control_action():
     url = f"http://{target_rig['ip']}:{target_rig['port']}"
     try:
         session = requests.Session()
-        # 1. Login to target rig to establish session and fetch CSRF token
         login_res = session.post(f"{url}/api/login", json={"pin": target_rig["pin"]}, timeout=4)
         if login_res.status_code == 200:
             login_data = login_res.json()
             if login_data.get("success"):
                 csrf_token = login_data.get("csrf_token")
-                
-                # 2. Forward request with CSRF header
                 headers = {
                     "X-CSRF-Token": csrf_token,
                     "Content-Type": "application/json"
@@ -264,9 +363,9 @@ def proxy_control_action():
                 fwd_res = session.post(f"{url}{endpoint}", json=payload, headers=headers, timeout=4)
                 if fwd_res.status_code == 200:
                     return jsonify(fwd_res.json())
-                return jsonify({"success": False, "message": f"Proxy call failed: host returned {fwd_res.status_code}"}), fwd_res.status_code
+                return jsonify({"success": False, "message": "Proxy call failed."}), fwd_res.status_code
             return jsonify({"success": False, "message": "Verification rejected on target rig."}), 401
-        return jsonify({"success": False, "message": f"Authorization request returned status code {login_res.status_code}"}), 401
+        return jsonify({"success": False, "message": "Authorization request returned error code."}), 401
     except Exception as e:
         logging.error(f"Proxy request execution error: {e}")
         return jsonify({"success": False, "message": "Failed to contact target rig API. Verify connectivity."}), 500
@@ -281,10 +380,8 @@ def proxy_log_action(rig_id):
     url = f"http://{target_rig['ip']}:{target_rig['port']}"
     try:
         session = requests.Session()
-        # Authenticate with credentials first
         login_res = session.post(f"{url}/api/login", json={"pin": target_rig["pin"]}, timeout=4)
         if login_res.status_code == 200 and login_res.json().get("success"):
-            # Get miner log file
             log_res = session.get(f"{url}/api/miner/log", timeout=4)
             if log_res.status_code == 200:
                 return jsonify(log_res.json())

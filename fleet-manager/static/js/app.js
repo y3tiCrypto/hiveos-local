@@ -27,6 +27,60 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global variables
     let logPollInterval = null;
     let currentLogRigId = null;
+    let csrfToken = null;
+
+    // HTML Escaping Utility to prevent Stored XSS from mock rigs data
+    function escapeHTML(str) {
+        if (str === null || str === undefined) return '';
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
+    }
+
+    // Authenticated API request handler that catches 401s and injects CSRF headers
+    async function fetchWithAuth(url, options = {}) {
+        if (options.method && ['POST', 'DELETE'].includes(options.method.toUpperCase())) {
+            if (!options.headers) options.headers = {};
+            if (csrfToken) {
+                options.headers['X-CSRF-Token'] = csrfToken;
+            }
+        }
+        
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                document.getElementById('loginOverlay').classList.remove('d-none');
+                document.getElementById('loginOverlay').classList.add('d-flex');
+                return null;
+            }
+            return res;
+        } catch (err) {
+            console.error(`Request to ${url} failed:`, err);
+            throw err;
+        }
+    }
+
+    // Check session authentication status on page load
+    async function checkAuth() {
+        try {
+            const res = await fetchWithAuth('/api/rigs');
+            if (!res) return;
+            if (res.ok) {
+                const data = await res.json();
+                if (data.csrf_token) {
+                    csrfToken = data.csrf_token;
+                }
+                document.getElementById('loginOverlay').classList.add('d-none');
+                document.getElementById('loginOverlay').classList.remove('d-flex');
+                fetchFleet();
+            }
+        } catch (e) {
+            console.error("Auth initialization failed:", e);
+        }
+    }
 
     // Toast Utility Helper
     function showToast(message, isSuccess = true) {
@@ -47,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         icon.className = 'bi bi-arrow-clockwise spin-animation';
 
         try {
-            const res = await fetch('/api/fleet/stats');
+            const res = await fetchWithAuth('/api/fleet/stats');
+            if (!res) return;
             if (res.ok) {
                 const data = await res.json();
                 if (data.success) {
@@ -101,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const gpus = stats.gpus || [];
                 const cpu = stats.system.cpu || {};
                 
-                // Construct GPU listings summary
+                // Construct GPU listings summary with HTML escaping
                 let gpuElementsHTML = '';
                 if (gpus.length > 0) {
                     gpuElementsHTML = `
@@ -119,11 +174,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <tbody>
                                     ${gpus.map(g => `
                                         <tr>
-                                            <td class="fw-semibold text-white">#${g.index}</td>
-                                            <td><span class="brand-${g.brand.toLowerCase()}">${g.brand}</span></td>
-                                            <td>${g.temp}°C / ${g.fan}%</td>
-                                            <td>${g.power}W</td>
-                                            <td class="text-end font-monospace text-primary fw-semibold">${g.hashrate} MH/s</td>
+                                            <td class="fw-semibold text-white">#${escapeHTML(g.index)}</td>
+                                            <td><span class="brand-${escapeHTML(g.brand.toLowerCase())}">${escapeHTML(g.brand)}</span></td>
+                                            <td>${escapeHTML(g.temp)}°C / ${escapeHTML(g.fan)}%</td>
+                                            <td>${escapeHTML(g.power)}W</td>
+                                            <td class="text-end font-monospace text-primary fw-semibold">${escapeHTML(g.hashrate)} MH/s</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -134,12 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     gpuElementsHTML = `<p class="small text-muted mt-2 mb-0"><i class="bi bi-info-circle"></i> No active GPUs detected on this rig.</p>`;
                 }
 
-                // Compile CPU miner block
+                // Compile CPU miner block with HTML escaping
                 let cpuHTML = '';
                 if (cpu.hashrate > 0) {
                     cpuHTML = `
                         <div class="mt-2 p-2 rounded bg-dark-card d-flex justify-content-between align-items-center border border-secondary-subtle" style="font-size: 0.8rem;">
-                            <span class="text-muted"><i class="bi bi-cpu text-info"></i> CPU Mining (${cpu.model})</span>
+                            <span class="text-muted"><i class="bi bi-cpu text-info"></i> CPU Mining (${escapeHTML(cpu.model)})</span>
                             <span class="font-monospace text-info-emphasis fw-bold">${(cpu.hashrate / 1000.0).toFixed(1)} KH/s</span>
                         </div>
                     `;
@@ -153,11 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary-subtle">
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="pulse-online" title="Online"></span>
-                                        <h3 class="h5 fw-bold mb-0 text-white">${rig.name}</h3>
+                                        <h3 class="h5 fw-bold mb-0 text-white">${escapeHTML(rig.name)}</h3>
                                     </div>
                                     <div class="d-flex gap-1">
-                                        <span class="badge badge-coin">Coin: ${coin}</span>
-                                        <span class="badge badge-miner">${activeMiner}</span>
+                                        <span class="badge badge-coin">Coin: ${escapeHTML(coin)}</span>
+                                        <span class="badge badge-miner">${escapeHTML(activeMiner)}</span>
                                     </div>
                                 </div>
 
@@ -165,19 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="row g-2 mb-2" style="font-size: 0.85rem;">
                                     <div class="col-6">
                                         <span class="text-muted d-block">IP / Port</span>
-                                        <span class="fw-semibold">${rig.ip}:${rig.port}</span>
+                                        <span class="fw-semibold">${escapeHTML(rig.ip)}:${escapeHTML(rig.port)}</span>
                                     </div>
                                     <div class="col-6">
                                         <span class="text-muted d-block">Uptime</span>
-                                        <span class="fw-semibold">${stats.system.uptime}</span>
+                                        <span class="fw-semibold">${escapeHTML(stats.system.uptime)}</span>
                                     </div>
                                     <div class="col-6">
                                         <span class="text-muted d-block">Rig ID</span>
-                                        <span class="fw-semibold font-monospace">${stats.system.rig_id}</span>
+                                        <span class="fw-semibold font-monospace">${escapeHTML(stats.system.rig_id)}</span>
                                     </div>
                                     <div class="col-6">
                                         <span class="text-muted d-block">RAM Usage</span>
-                                        <span class="fw-semibold">${stats.system.ram_used_pct}% of ${stats.system.ram_total_gb} GB</span>
+                                        <span class="fw-semibold">${escapeHTML(stats.system.ram_used_pct)}% of ${escapeHTML(stats.system.ram_total_gb)} GB</span>
                                     </div>
                                 </div>
 
@@ -187,19 +242,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             <!-- Controls buttons -->
                             <div class="mt-4 pt-3 border-top border-secondary-subtle d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-warning fw-semibold px-3 rig-control-btn" data-rig-id="${rig.id}" data-action="/api/miner/control" data-payload='{"action":"restart"}' data-confirm-msg="Restart miner daemon on ${rig.name}?">
+                                <button class="btn btn-sm btn-outline-warning fw-semibold px-3 rig-control-btn" data-rig-id="${escapeHTML(rig.id)}" data-action="/api/miner/control" data-payload='{"action":"restart"}' data-confirm-msg="Restart miner daemon on ${escapeHTML(rig.name)}?">
                                     <i class="bi bi-arrow-counterclockwise"></i> Restart Miner
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger fw-semibold px-3 rig-control-btn" data-rig-id="${rig.id}" data-action="/api/system/reboot" data-payload='{}' data-confirm-msg="Are you sure you want to REBOOT ${rig.name}?">
+                                <button class="btn btn-sm btn-outline-danger fw-semibold px-3 rig-control-btn" data-rig-id="${escapeHTML(rig.id)}" data-action="/api/system/reboot" data-payload='{}' data-confirm-msg="Are you sure you want to REBOOT ${escapeHTML(rig.name)}?">
                                     <i class="bi bi-power"></i> Reboot
                                 </button>
-                                <button class="btn btn-sm btn-outline-primary fw-semibold px-3 view-log-btn" data-rig-id="${rig.id}" data-rig-name="${rig.name}">
+                                <button class="btn btn-sm btn-outline-primary fw-semibold px-3 view-log-btn" data-rig-id="${escapeHTML(rig.id)}" data-rig-name="${escapeHTML(rig.name)}">
                                     <i class="bi bi-terminal"></i> Logs
                                 </button>
-                                <a href="http://${rig.ip}:${rig.port}" target="_blank" class="btn btn-sm btn-outline-secondary fw-semibold ms-auto px-3">
+                                <a href="http://${escapeHTML(rig.ip)}:${escapeHTML(rig.port)}" target="_blank" class="btn btn-sm btn-outline-secondary fw-semibold ms-auto px-3">
                                     <i class="bi bi-box-arrow-up-right"></i> Open Link
                                 </a>
-                                <button class="btn btn-sm btn-outline-secondary text-danger border-danger-subtle delete-rig-btn px-2" data-rig-id="${rig.id}" data-rig-name="${rig.name}" title="Remove Rig">
+                                <button class="btn btn-sm btn-outline-secondary text-danger border-danger-subtle delete-rig-btn px-2" data-rig-id="${escapeHTML(rig.id)}" data-rig-name="${escapeHTML(rig.name)}" title="Remove Rig">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -207,27 +262,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             } else {
-                // Offline rendering state
+                // Offline rendering state with HTML escaping
                 cardCol.innerHTML = `
                     <div class="card glass-card h-100 border-danger border-opacity-25 bg-danger bg-opacity-10">
                         <div class="card-body d-flex flex-column justify-content-between text-center py-4">
                             <div>
                                 <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
                                     <span class="pulse-offline" title="Offline"></span>
-                                    <h3 class="h5 fw-bold mb-0 text-white">${rig.name}</h3>
+                                    <h3 class="h5 fw-bold mb-0 text-white">${escapeHTML(rig.name)}</h3>
                                 </div>
                                 <p class="text-danger small mb-1 fw-semibold"><i class="bi bi-exclamation-triangle-fill"></i> Host Offline or Connection Failed</p>
-                                <p class="text-muted small font-monospace mb-4 bg-dark bg-opacity-50 p-2 rounded">${rig.ip}:${rig.port} - ${rig.error || 'Connection timed out.'}</p>
+                                <p class="text-muted small font-monospace mb-4 bg-dark bg-opacity-50 p-2 rounded">${escapeHTML(rig.ip)}:${escapeHTML(rig.port)} - ${escapeHTML(rig.error || 'Connection timed out.')}</p>
                             </div>
 
                             <div class="d-flex gap-2 justify-content-center">
-                                <button class="btn btn-sm btn-outline-light px-4 retry-rig-btn" data-rig-id="${rig.id}">
+                                <button class="btn btn-sm btn-outline-light px-4 retry-rig-btn" data-rig-id="${escapeHTML(rig.id)}">
                                     <i class="bi bi-arrow-repeat"></i> Retry Connection
                                 </button>
-                                <a href="http://${rig.ip}:${rig.port}" target="_blank" class="btn btn-sm btn-outline-secondary px-3 text-white border-secondary">
+                                <a href="http://${escapeHTML(rig.ip)}:${escapeHTML(rig.port)}" target="_blank" class="btn btn-sm btn-outline-secondary px-3 text-white border-secondary">
                                     <i class="bi bi-box-arrow-up-right"></i> Local Link
                                 </a>
-                                <button class="btn btn-sm btn-outline-danger px-3 delete-rig-btn" data-rig-id="${rig.id}" data-rig-name="${rig.name}">
+                                <button class="btn btn-sm btn-outline-danger px-3 delete-rig-btn" data-rig-id="${escapeHTML(rig.id)}" data-rig-name="${escapeHTML(rig.name)}">
                                     <i class="bi bi-trash"></i> Remove
                                 </button>
                             </div>
@@ -244,7 +299,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function bindCardActions() {
-        // Control actions buttons (Restart Miner, Reboot, Shutdown)
         document.querySelectorAll('.rig-control-btn').forEach(btn => {
             btn.addEventListener('click', async function() {
                 const rigId = this.dataset.rigId;
@@ -259,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...`;
 
                 try {
-                    const res = await fetch('/api/fleet/control', {
+                    const res = await fetchWithAuth('/api/fleet/control', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -270,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             payload: payload
                         })
                     });
+                    if (!res) return;
                     const data = await res.json();
                     if (res.ok && data.success) {
                         showToast(data.message || "Command successfully executed!", true);
@@ -295,7 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!confirm(`Are you sure you want to remove rig '${name}' from Fleet Manager monitoring?`)) return;
 
                 try {
-                    const res = await fetch(`/api/rigs/${rigId}`, { method: 'DELETE' });
+                    const res = await fetchWithAuth(`/api/rigs/${rigId}`, { method: 'DELETE' });
+                    if (!res) return;
                     const data = await res.json();
                     if (res.ok && data.success) {
                         showToast(data.message, true);
@@ -336,7 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchRigLog() {
         if (!currentLogRigId) return;
         try {
-            const res = await fetch(`/api/fleet/log/${currentLogRigId}`);
+            const res = await fetchWithAuth(`/api/fleet/log/${currentLogRigId}`);
+            if (!res) return;
             if (res.ok) {
                 const data = await res.json();
                 if (data.success && data.log) {
@@ -383,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pin = document.getElementById('rigPin').value.trim();
 
         try {
-            const res = await fetch('/api/rigs', {
+            const res = await fetchWithAuth('/api/rigs', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -395,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pin: pin
                 })
             });
+            if (!res) return;
             const data = await res.json();
             if (res.ok && data.success) {
                 showToast(data.message, true);
@@ -415,9 +473,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Login Form Submit handler
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const pin = document.getElementById('loginPin').value.trim();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Authorizing...`;
+        document.getElementById('loginError').classList.add('d-none');
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                csrfToken = data.csrf_token;
+                document.getElementById('loginOverlay').classList.add('d-none');
+                document.getElementById('loginOverlay').classList.remove('d-flex');
+                document.getElementById('loginPin').value = '';
+                fetchFleet();
+            } else {
+                document.getElementById('loginError').textContent = data.message || "Invalid Access PIN.";
+                document.getElementById('loginError').classList.remove('d-none');
+            }
+        } catch (err) {
+            console.error(err);
+            document.getElementById('loginError').textContent = "Connection error checking credentials.";
+            document.getElementById('loginError').classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Authorize Fleet Session`;
+        }
+    });
+
     // Refresh button click
     refreshFleetBtn.addEventListener('click', fetchFleet);
 
     // Initial page load fetch
-    fetchFleet();
+    checkAuth();
 });

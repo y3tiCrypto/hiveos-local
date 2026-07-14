@@ -30,8 +30,13 @@ Please do not open public issues on GitHub for potential security bugs until the
 
 Please Note - your hardware is only as secure as your network and the end-user is responsible for maintaining good security practices. If your local network is compromised an actor can attempt to alter your configuration, mining settings, overclocks and more. 
 
-Any device able to reach port 8080 can make Fleet Manager use its stored PINs to reboot or shut down rigs, stop miners, alter overclocks, read logs, or delete fleet entries.
-Recommended: do not deploy Fleet Manager until it has authentication, authorization, CSRF protection, session security, and network allowlisting. As an immediate containment measure, bind it to 127.0.0.1 or a dedicated VPN address instead of all interfaces.
+### Fleet Manager Security Hardening
+- **Access Authorization**: The Fleet Manager is protected by a secure 8-character cryptographic random PIN generated on initial startup and printed to the container logs.
+- **Brute-Force Rate Limiting**: The system monitors failed auth attempts and locks out IPs for 15 minutes after 5 failed login operations.
+- **Session Hardening & CSRF Protection**: Session cookies are configured with `HttpOnly` and `SameSite=Lax` properties, and modifying endpoints require an Anti-CSRF token header (`X-CSRF-Token`) matching the active session state.
+- **Stored XSS Mitigation**: Dynamic values reported from monitored rigs are fully escaped before rendering.
+- **Privilege Separation**: The container is configured to run as a non-privileged `miner` user, and credentials stored at rest (`rigs.json` and `fleet_pin.txt`) are created with restricted `0600` owner-only permissions.
+- **Expose Limits**: It is highly recommended to run the Fleet Manager within a secured local subnet or encrypted VPN segment, rather than publishing it directly to public ingress interfaces.
 
 ---
 

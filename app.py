@@ -547,7 +547,13 @@ def save_overclock():
         return jsonify({"success": False, "message": "Invalid JSON payload"}), 400
         
     brand = data.get("brand", "").upper()
-    gpu_index = int(data.get("index", 0))
+    try:
+        gpu_index = int(data.get("index", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "GPU index must be an integer."}), 400
+        
+    if not (0 <= gpu_index < 64):
+        return jsonify({"success": False, "message": "GPU index out of acceptable bounds (0-63)."}), 400
     
     if brand not in ["NVIDIA", "AMD"]:
         return jsonify({"success": False, "message": "Invalid brand specification"}), 400

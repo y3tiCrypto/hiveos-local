@@ -100,6 +100,25 @@ Note that Fleet Manager listens on port 8080, Any device able to reach port 8080
 - **Control Implemented**: Coin, Wallet addresses, and Pool URLs are parsed and whitelisted using alphanumeric and secure schemes validations. Miner configurations are mapped directly to a whitelisted array: `["lolminer", "xmrig", "gminer", "rigel", "bzminer", "teamredminer", "hiveon", "srbminer", "wildrig-multi", "bminer", "ccminer", "t-rex", "none"]`.
 - **Audit Result**: **SECURE**.
 
+### 2.14. Fleet Manager Access Control & Session Hardening (CWE-306 / CWE-352)
+- **Control Implemented**:
+  - Implemented 8-character cryptographically secure access PIN generation using Python `secrets`.
+  - Added failed attempts IP lockout rate limiting (blocks IP for 15 minutes after 5 failures).
+  - Enforced Flask Session security cookie configuration (HttpOnly, SameSite=Lax) and Anti-CSRF token verification on all POST/DELETE requests.
+- **Audit Result**: **SECURE**.
+
+### 2.15. Stored XSS Mitigation on Fleet Status Dashboard (CWE-79)
+- **Control Implemented**: All dynamic host-reported variables (name, ip, port, coin, active miner, uptime, RAM/CPU/GPU lists) are sanitized using a strict HTML escaping filter (`escapeHTML`) in `app.js` prior to being injected into the DOM.
+- **Audit Result**: **SECURE**.
+
+### 2.16. Container Level Privilege Isolation (CWE-250)
+- **Control Implemented**: Docker containers run as a dedicated, non-privileged user (`USER miner`, UID 10001) instead of root, and configurations are stored with owner-only access permissions (`0600` on credentials and `0700` on folders).
+- **Audit Result**: **SECURE**.
+
+### 2.17. GPU index bounds validation (CWE-400 / CWE-20)
+- **Control Implemented**: Added boundary constraints (`0 <= index < 64`) to the GPU overclock endpoint to prevent attackers or malformed payloads from allocating excessively large memory arrays.
+- **Audit Result**: **SECURE**.
+
 ---
 
 ## 3. Threat Modeling & Risk Matrix
