@@ -1,7 +1,7 @@
 # HiveOS Local GPU Manager (HiveOS-Local)
 
 [![GitHub Stars](https://img.shields.io/github/stars/y3tiCrypto/hiveos-local?style=flat-square&logo=github&color=yellow)](https://github.com/y3tiCrypto/hiveos-local/stargazers)
-[![Views](https://api.visitorbadge.io/api/visitors?path=y3tiCrypto.hiveos-local&label=views/clones&countColor=%2326313f&style=flat-square)](https://github.com/y3tiCrypto/hiveos-local)
+[![Views](https://komarev.com/normal-counter/?id=y3tiCrypto-hiveos-local&label=views/clones&color=blue&style=flat-square)](https://github.com/y3tiCrypto/hiveos-local)
 
 A lightweight, local, browser-based emergency diagnostics and GPU overclocking manager designed to run side-by-side on rigs powered by **HiveOS** (https://hiveon.com).
 
